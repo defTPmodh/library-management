@@ -14,15 +14,18 @@ export async function POST(request, { params }) {
       return NextResponse.json(books);
     } 
     else if (query.includes("INSERT")) {
-      const [title, author] = values;
+      const [title, author, genre] = values;
+      console.log("Creating book with genre:", genre); // Debug log
       const newBook = await prisma.book.create({
         data: {
           title,
           author,
+          genre: genre || "Uncategorized", // Ensure genre is set
           library,
           status: "available"
         }
       });
+      console.log("Created book:", newBook); // Debug log
       return NextResponse.json(newBook);
     }
     else if (query.includes("DELETE")) {

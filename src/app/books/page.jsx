@@ -100,8 +100,12 @@ function BooksPage() {
 
     try {
       const dbName = localStorage.getItem("databaseName");
-      await fetch(`/api/db/${dbName}`, {
+      console.log("Adding book with genre:", genre); // Debug log
+      const response = await fetch(`/api/db/${dbName}`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           query:
             "INSERT INTO `books` (title, author, genre, status) VALUES (?, ?, ?, 'available')",
@@ -109,9 +113,17 @@ function BooksPage() {
         }),
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to add book');
+      }
+
+      const result = await response.json();
+      console.log("Added book:", result); // Debug log
+
       fetchBooks(dbName);
       setTitle("");
       setAuthor("");
+      setGenre("Fiction"); // Reset to default genre
     } catch (error) {
       console.error("Error adding book:", error);
     }
