@@ -9,15 +9,41 @@ function BooksPage() {
   const [loading, setLoading] = useState(true);
   const [borrowRecords, setBorrowRecords] = useState([]);
   const [libraryName, setLibraryName] = useState("");
+  const [statistics, setStatistics] = useState({
+    total: 0,
+    available: 0
+  });
 
+  // Combined fetch effect
   useEffect(() => {
-    const storedLibraryName = localStorage.getItem("libraryName");
-    const storedDbName = localStorage.getItem("databaseName");
-    setLibraryName(storedLibraryName || "");
-    fetchBooks(storedDbName);
-    fetchBorrows();
-    setLoading(false);
-  }, []);
+    const initializePage = async () => {
+      const storedLibraryName = localStorage.getItem("libraryName");
+      const storedDbName = localStorage.getItem("databaseName");
+      setLibraryName(storedLibraryName || "");
+      
+      try {
+        await fetchBooks(storedDbName);
+        await fetchBorrows();
+      } catch (error) {
+        console.error("Error initializing page:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializePage();
+  }, []); // Only run once on mount
+
+  // Update statistics when books change
+  useEffect(() => {
+    if (books.length > 0 || !loading) {
+      const availableBooks = books.filter(book => book.status === "available").length;
+      setStatistics({
+        total: books.length,
+        available: availableBooks
+      });
+    }
+  }, [books, loading]);
 
   const fetchBorrows = async () => {
     try {
@@ -42,7 +68,6 @@ function BooksPage() {
     } catch (error) {
       console.error("Error fetching books:", error);
     }
-    setLoading(false);
   };
 
   const handleSubmit = async (e) => {
@@ -104,6 +129,19 @@ function BooksPage() {
           <h1 className="text-3xl font-bold mb-8 font-roboto text-gray-800">
             {libraryName} - Book Manager
           </h1>
+
+          {/* Statistics Section */}
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-800 mb-2">Total Books</h2>
+              <p className="text-3xl font-bold text-blue-600">{statistics.total}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-800 mb-2">Available Books</h2>
+              <p className="text-3xl font-bold text-green-600">{statistics.available}</p>
+            </div>
+          </div>
+
           <form
             onSubmit={handleSubmit}
             className="bg-white p-6 rounded-lg shadow-md mb-8"

@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 
 function LoginPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,7 +55,7 @@ function LoginPage() {
       const storedPassword = localStorage.getItem("password");
 
       if (!storedId || !storedPassword) {
-        window.location.href = "/";
+        setIsCheckingAuth(false);
         return;
       }
 
@@ -70,36 +71,37 @@ function LoginPage() {
           }),
         });
 
-        if (!response.ok) {
-          throw new Error();
+        if (response.ok) {
+          window.location.href = "/dashboard";
+        } else {
+          localStorage.removeItem("employeeId");
+          localStorage.removeItem("password");
+          localStorage.removeItem("libraryName");
+          localStorage.removeItem("databaseName");
         }
       } catch (err) {
         localStorage.removeItem("employeeId");
         localStorage.removeItem("password");
         localStorage.removeItem("libraryName");
-        window.location.href = "/";
+        localStorage.removeItem("databaseName");
       }
+      setIsCheckingAuth(false);
     };
-    const currentPath = window.location.pathname;
-    if (currentPath !== "/" && currentPath !== "") {
+
+    if (window.location.pathname === "/") {
       checkAuth();
+    } else {
+      setIsCheckingAuth(false);
     }
   }, []);
 
-  const navigate = useCallback((path) => {
-    window.location.href = path;
-  }, []);
-
-  useEffect(() => {
-    const currentPath = window.location.pathname;
-    if (currentPath === "/") {
-      const storedId = localStorage.getItem("employeeId");
-      const storedPassword = localStorage.getItem("password");
-      if (storedId && storedPassword) {
-        navigate("/dashboard");
-      }
-    }
-  }, [navigate]);
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fa] flex justify-center items-center">
+        <div className="text-xl font-roboto">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">

@@ -369,11 +369,19 @@ function BorrowsPage() {
                             <div className="flex items-center">
                               <i className="fas fa-clock w-5"></i>
                               Borrowed:{" "}
-                              {new Date(borrow.borrowDate).toLocaleDateString()}
+                              {new Date(borrow.borrowDate).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: '2-digit'
+                              })}
                             </div>
                             <div className="flex items-center">
                               <i className="fas fa-calendar-alt w-5"></i>
-                              Due: {new Date(borrow.dueDate).toLocaleDateString()}
+                              Due: {new Date(borrow.dueDate).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: '2-digit'
+                              })}
                             </div>
                             <div className="flex items-center">
                               <i className="fas fa-user w-5"></i>
