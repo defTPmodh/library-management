@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Navigation from "../../components/Navigation";
+import { motion } from "framer-motion";
 
 function DashboardPage() {
   const [selectedSection, setSelectedSection] = useState("available");
@@ -10,6 +11,27 @@ function DashboardPage() {
   const [libraryName, setLibraryName] = useState("");
   const [users, setUsers] = useState([]);
   const [menuOpen, setMenuOpen] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5 }
+    }
+  };
 
   useEffect(() => {
     const storedLibraryName = localStorage.getItem("libraryName");
@@ -32,6 +54,8 @@ function DashboardPage() {
     } catch (err) {
       console.error("Error fetching data:", err);
       setBooks([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,49 +111,91 @@ function DashboardPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background dark:bg-background-dark flex justify-center items-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-xl font-roboto text-gray-800 dark:text-gray-200"
+        >
+          Loading...
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#f8f9fa]">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 dark:from-background-dark dark:via-background-dark dark:to-primary-dark/5 transition-colors duration-300">
       <Navigation />
-      <div className="p-8 md:p-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-4xl font-bold text-[#2c3e50] font-roboto">
+      <motion.div 
+        className="p-8 md:p-12"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <div className="max-w-7xl mx-auto">
+          <motion.div 
+            variants={itemVariants}
+            className="flex items-center justify-between mb-8"
+          >
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-roboto">
               {libraryName} Dashboard
             </h1>
-            <div className="text-[#7f8c8d]">
+            <motion.div 
+              className="text-primary dark:text-primary-light"
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, -10, 10, 0]
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                repeatType: "reverse"
+              }}
+            >
               <i className="fas fa-book-reader text-3xl"></i>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
-          <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow mb-8">
+          <motion.div 
+            variants={itemVariants}
+            className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 mb-8"
+          >
             <div className="flex items-center">
-              <i className="fas fa-search text-[#3498db] text-xl mr-3"></i>
+              <i className="fas fa-search text-primary dark:text-primary-light text-xl mr-3"></i>
               <input
                 type="text"
                 placeholder="Search books by title or author..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full p-3 rounded-lg border border-[#dfe6e9] focus:ring-2 focus:ring-[#3498db] focus:border-[#3498db] transition-colors outline-none"
+                className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
               />
             </div>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Available Books Section */}
-            <div
-              className={`bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
-                selectedSection === "available" ? "ring-2 ring-[#3498db]" : ""
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              className={`bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-8 rounded-xl shadow-lg transition-all duration-300 cursor-pointer ${
+                selectedSection === "available" ? "ring-2 ring-primary dark:ring-primary-light" : ""
               }`}
               onClick={() => setSelectedSection("available")}
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <i className="fas fa-book text-[#2ecc71] text-2xl mr-3"></i>
-                  <h2 className="text-2xl font-semibold text-[#2c3e50] font-roboto">
+                  <motion.i 
+                    className="fas fa-book text-accent dark:text-accent-light text-2xl mr-3"
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  ></motion.i>
+                  <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 font-roboto">
                     Available Books
                   </h2>
                 </div>
-                <span className="bg-[#2ecc71]/10 text-[#2ecc71] py-1 px-4 rounded-full text-sm font-medium">
+                <span className="bg-accent/10 dark:bg-accent-light/10 text-accent dark:text-accent-light py-1 px-4 rounded-full text-sm font-medium">
                   {availableBooks.length}
                 </span>
               </div>
@@ -145,23 +211,29 @@ function DashboardPage() {
                   />
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Borrowed Books Section */}
-            <div
-              className={`bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
-                selectedSection === "borrowed" ? "ring-2 ring-[#3498db]" : ""
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              className={`bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-8 rounded-xl shadow-lg transition-all duration-300 cursor-pointer ${
+                selectedSection === "borrowed" ? "ring-2 ring-primary dark:ring-primary-light" : ""
               }`}
               onClick={() => setSelectedSection("borrowed")}
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <i className="fas fa-hand-holding-heart text-[#f1c40f] text-2xl mr-3"></i>
-                  <h2 className="text-2xl font-semibold text-[#2c3e50] font-roboto">
+                  <motion.i 
+                    className="fas fa-hand-holding-heart text-secondary dark:text-secondary-light text-2xl mr-3"
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  ></motion.i>
+                  <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 font-roboto">
                     Borrowed Books
                   </h2>
                 </div>
-                <span className="bg-[#f1c40f]/10 text-[#f1c40f] py-1 px-4 rounded-full text-sm font-medium">
+                <span className="bg-secondary/10 dark:bg-secondary-light/10 text-secondary dark:text-secondary-light py-1 px-4 rounded-full text-sm font-medium">
                   {borrowedBooks.length}
                 </span>
               </div>
@@ -177,23 +249,29 @@ function DashboardPage() {
                   />
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Overdue Books Section */}
-            <div
-              className={`bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
-                selectedSection === "overdue" ? "ring-2 ring-[#3498db]" : ""
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              className={`bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-8 rounded-xl shadow-lg transition-all duration-300 cursor-pointer ${
+                selectedSection === "overdue" ? "ring-2 ring-primary dark:ring-primary-light" : ""
               }`}
               onClick={() => setSelectedSection("overdue")}
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <i className="fas fa-exclamation-circle text-[#e74c3c] text-2xl mr-3"></i>
-                  <h2 className="text-2xl font-semibold text-[#2c3e50] font-roboto">
+                  <motion.i 
+                    className="fas fa-exclamation-circle text-red-500 dark:text-red-400 text-2xl mr-3"
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  ></motion.i>
+                  <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 font-roboto">
                     Overdue Books
                   </h2>
                 </div>
-                <span className="bg-[#e74c3c]/10 text-[#e74c3c] py-1 px-4 rounded-full text-sm font-medium">
+                <span className="bg-red-500/10 dark:bg-red-400/10 text-red-500 dark:text-red-400 py-1 px-4 rounded-full text-sm font-medium">
                   {overdueBooks.length}
                 </span>
               </div>
@@ -209,10 +287,10 @@ function DashboardPage() {
                   />
                 ))}
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -220,46 +298,58 @@ function DashboardPage() {
 // BookItem component
 function BookItem({ book, menuOpen, setMenuOpen, onEdit, onDelete }) {
   return (
-    <div
-      className="p-4 rounded-lg border border-[#dfe6e9] hover:border-[#3498db] transition-colors relative"
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="p-4 rounded-lg border border-gray-300 dark:border-gray-600 hover:border-primary dark:hover:border-primary-light bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm transition-all duration-300 relative"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center space-x-2">
-            <i className="fas fa-book text-[#7f8c8d]"></i>
-            <h3 className="font-medium text-[#2c3e50]">{book.title}</h3>
+            <i className="fas fa-book text-primary dark:text-primary-light"></i>
+            <h3 className="font-medium text-gray-800 dark:text-gray-200">{book.title}</h3>
           </div>
-          <p className="text-sm text-[#7f8c8d] mt-1">by {book.author}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">by {book.author}</p>
         </div>
         <div className="relative">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => setMenuOpen(menuOpen === book.id ? null : book.id)}
-            className="text-[#7f8c8d] hover:text-[#2c3e50] transition-colors"
+            className="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-light transition-colors"
           >
             <i className="fas fa-ellipsis-v"></i>
-          </button>
+          </motion.button>
           {menuOpen === book.id && (
-            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10"
+            >
               <div className="py-1">
-                <button
+                <motion.button
+                  whileHover={{ backgroundColor: "rgba(0,0,0,0.05)" }}
                   onClick={() => onEdit(book)}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300"
                 >
                   <i className="fas fa-edit mr-2"></i>Edit
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ backgroundColor: "rgba(239,68,68,0.1)" }}
                   onClick={() => onDelete(book.id)}
-                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400"
                 >
                   <i className="fas fa-trash-alt mr-2"></i>Delete
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

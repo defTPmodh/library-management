@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { useTheme } from '../context/ThemeContext';
 
 function LoginPage() {
   const [employeeId, setEmployeeId] = useState("");
@@ -7,6 +9,28 @@ function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const { darkMode, toggleDarkMode } = useTheme();
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5 }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -97,77 +121,136 @@ function LoginPage() {
 
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex justify-center items-center">
-        <div className="text-xl font-roboto">Loading...</div>
+      <div className="min-h-screen bg-background dark:bg-background-dark flex justify-center items-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-xl font-roboto text-gray-800 dark:text-gray-200"
+        >
+          Loading...
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa]">
-      <nav className="bg-white shadow-md p-4">
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10 dark:from-background-dark dark:via-background-dark dark:to-primary-dark/10 transition-colors duration-300"
+    >
+      <nav className="bg-surface/80 dark:bg-surface-dark/80 shadow-lg backdrop-blur-md p-4 transition-colors duration-300">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="text-xl font-bold font-roboto text-[#2c3e50]">
+          <motion.div 
+            variants={itemVariants}
+            className="text-xl font-bold font-roboto bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
+          >
             Library Management System
-          </div>
+          </motion.div>
+          <motion.button
+            variants={itemVariants}
+            onClick={toggleDarkMode}
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'} text-gray-600 dark:text-gray-300`}></i>
+          </motion.button>
         </div>
       </nav>
 
-      <div className="flex items-center justify-center py-12">
-        <div className="bg-white p-10 rounded-xl shadow-lg w-full max-w-md">
-          <div className="text-center mb-8">
-            <i className="fas fa-book-reader text-[#3498db] text-6xl mb-4"></i>
-            <h1 className="text-2xl font-bold text-[#2c3e50] font-roboto">
+      <div className="flex items-center justify-center py-12 px-4">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-10 rounded-xl shadow-lg hover:shadow-xl transition-shadow w-full max-w-md"
+        >
+          <motion.div 
+            variants={itemVariants}
+            className="text-center mb-8"
+          >
+            <motion.i 
+              className="fas fa-book-reader text-primary dark:text-primary-light text-6xl mb-4"
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, -10, 10, 0] 
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                repeatType: "reverse"
+              }}
+            ></motion.i>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200 font-roboto">
               Library Staff Portal
             </h1>
-            <p className="text-[#7f8c8d] mt-2 font-roboto">
+            <p className="text-gray-600 dark:text-gray-400 mt-2 font-roboto">
               Sign in to manage your library
             </p>
-          </div>
+          </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold font-roboto text-[#2c3e50] mb-2">
+            <motion.div variants={itemVariants}>
+              <label className="block text-sm font-semibold font-roboto text-gray-800 dark:text-gray-200 mb-2">
                 Employee ID
               </label>
               <input
                 type="text"
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-[#dfe6e9] focus:border-[#3498db] focus:ring-2 focus:ring-[#3498db]/20 transition-colors outline-none"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:border-primary dark:focus:border-primary-light focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none"
                 placeholder="Enter your ID"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold font-roboto text-[#2c3e50] mb-2">
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <label className="block text-sm font-semibold font-roboto text-gray-800 dark:text-gray-200 mb-2">
                 Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-[#dfe6e9] focus:border-[#3498db] focus:ring-2 focus:ring-[#3498db]/20 transition-colors outline-none"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:border-primary dark:focus:border-primary-light focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none"
                 placeholder="Enter your password"
                 required
               />
-            </div>
+            </motion.div>
 
             {error && (
-              <div className="text-[#e74c3c] text-sm font-roboto">{error}</div>
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 dark:text-red-400 text-sm font-roboto"
+              >
+                {error}
+              </motion.div>
             )}
 
-            <button
+            <motion.button
+              variants={itemVariants}
               type="submit"
               disabled={loading}
-              className="w-full bg-[#3498db] text-white font-roboto py-3 px-4 rounded-lg hover:bg-[#2980b9] transition-colors focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white font-roboto py-3 px-4 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              {loading ? "Signing in..." : "Sign In"}
-            </button>
+              {loading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="inline-block"
+                >
+                  <i className="fas fa-circle-notch"></i>
+                </motion.div>
+              ) : (
+                "Sign In"
+              )}
+            </motion.button>
           </form>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
