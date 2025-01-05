@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Navigation from "../../components/Navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 function BorrowsPage() {
   const [borrowRecords, setBorrowRecords] = useState([]);
@@ -12,14 +13,45 @@ function BorrowsPage() {
   const [returnBook, setReturnBook] = useState("");
   const [libraryName, setLibraryName] = useState("");
   const [dbName, setDbName] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5 }
+    }
+  };
 
   useEffect(() => {
-    const storedLibraryName = localStorage.getItem("libraryName");
-    const storedDbName = localStorage.getItem("databaseName");
-    setLibraryName(storedLibraryName || "");
-    setDbName(storedDbName || "");
-    fetchBorrows();
-    fetchBooks();
+    const initializePage = async () => {
+      const storedLibraryName = localStorage.getItem("libraryName");
+      const storedDbName = localStorage.getItem("databaseName");
+      setLibraryName(storedLibraryName || "");
+      setDbName(storedDbName || "");
+      
+      try {
+        await Promise.all([fetchBorrows(), fetchBooks()]);
+      } catch (error) {
+        console.error("Error initializing page:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializePage();
   }, []);
 
   const fetchBorrows = async () => {
@@ -191,232 +223,313 @@ function BorrowsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background dark:bg-background-dark flex justify-center items-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-xl font-roboto text-gray-800 dark:text-gray-200"
+        >
+          <i className="fas fa-circle-notch fa-spin mr-2"></i>
+          Loading...
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-roboto">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 dark:from-background-dark dark:via-background-dark dark:to-primary-dark/5 transition-colors duration-300">
       <Navigation />
-      <div className="p-8 md:p-12">
-        <div className="max-w-5xl mx-auto space-y-10">
-          <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-bold text-[#2c3e50]">
+      <motion.div 
+        className="p-8 md:p-12"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <div className="max-w-7xl mx-auto space-y-10">
+          <motion.div 
+            variants={itemVariants}
+            className="flex items-center justify-between"
+          >
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-roboto">
               Library Book Management
             </h1>
-            <div className="text-[#7f8c8d]">
+            <motion.div 
+              className="text-primary dark:text-primary-light"
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, -10, 10, 0]
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                repeatType: "reverse"
+              }}
+            >
               <i className="fas fa-book-reader text-3xl"></i>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
-          <div className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+          <motion.div 
+            variants={itemVariants}
+            className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+          >
             <div className="flex items-center mb-6">
-              <i className="fas fa-book-open text-[#3498db] text-2xl mr-3"></i>
-              <h2 className="text-2xl font-semibold text-[#2c3e50]">
+              <motion.i 
+                className="fas fa-book-open text-primary dark:text-primary-light text-2xl mr-3"
+                animate={{ rotate: [0, -10, 10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              ></motion.i>
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
                 Check Out Book
               </h2>
             </div>
             <form onSubmit={handleCheckout} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-[#7f8c8d] mb-2">
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                     Borrower's Name
                   </label>
                   <input
                     type="text"
                     value={borrowerName}
                     onChange={(e) => setBorrowerName(e.target.value)}
-                    className="w-full p-3 border border-[#dfe6e9] rounded-lg focus:ring-2 focus:ring-[#3498db] focus:border-[#3498db] transition-colors outline-none"
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#7f8c8d] mb-2">
+                </motion.div>
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                     GR Number
                   </label>
                   <input
                     type="text"
                     value={grNumber}
                     onChange={(e) => setGrNumber(e.target.value)}
-                    className="w-full p-3 border border-[#dfe6e9] rounded-lg focus:ring-2 focus:ring-[#3498db] focus:border-[#3498db] transition-colors outline-none"
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
                     required
                   />
-                </div>
+                </motion.div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-[#7f8c8d] mb-2">
+              <motion.div variants={itemVariants}>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                   Class
                 </label>
                 <input
                   type="text"
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  className="w-full p-3 border border-[#dfe6e9] rounded-lg focus:ring-2 focus:ring-[#3498db] focus:border-[#3498db] transition-colors outline-none"
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#7f8c8d] mb-2">
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                   Select Book
                 </label>
                 <select
                   value={selectedBook}
                   onChange={(e) => setSelectedBook(e.target.value)}
-                  className="w-full p-3 border border-[#dfe6e9] rounded-lg focus:ring-2 focus:ring-[#3498db] focus:border-[#3498db] transition-colors outline-none"
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
                   required
                 >
                   <option value="">Select a book</option>
                   {books
                     .filter((book) => book.status === "available")
                     .map((book) => (
-                      <option key={book.id} value={book.id}>
+                      <option key={book.id} value={book.id} className="bg-white dark:bg-gray-800">
                         {book.title} by {book.author}
                       </option>
                     ))}
                 </select>
-              </div>
-              <button
+              </motion.div>
+              <motion.button
                 type="submit"
-                className="w-full bg-[#3498db] text-white py-3 px-6 rounded-lg hover:bg-[#2980b9] transition-colors focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:ring-offset-2"
+                className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white py-3 px-6 rounded-lg transition-all duration-300 transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
                 <i className="fas fa-paper-plane mr-2"></i>
                 Check Out Book
-              </button>
+              </motion.button>
             </form>
-          </div>
+          </motion.div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+            <motion.div 
+              variants={itemVariants}
+              className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+            >
               <div className="flex items-center mb-6">
-                <i className="fas fa-undo text-[#2ecc71] text-2xl mr-3"></i>
-                <h2 className="text-2xl font-semibold text-[#2c3e50]">
+                <motion.i 
+                  className="fas fa-undo text-accent dark:text-accent-light text-2xl mr-3"
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                ></motion.i>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
                   Return Book
                 </h2>
               </div>
               <form onSubmit={handleReturn} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-[#7f8c8d] mb-2">
+                <motion.div variants={itemVariants}>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                     Select Book to Return
                   </label>
                   <select
                     value={returnBook}
                     onChange={(e) => setReturnBook(e.target.value)}
-                    className="w-full p-3 border border-[#dfe6e9] rounded-lg focus:ring-2 focus:ring-[#2ecc71] focus:border-[#2ecc71] transition-colors outline-none"
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
                     required
                   >
                     <option value="">Select a book to return</option>
                     {books
                       .filter((book) => book.status === "borrowed")
                       .map((book) => (
-                        <option key={book.id} value={book.id}>
+                        <option key={book.id} value={book.id} className="bg-white dark:bg-gray-800">
                           {book.title} (Borrowed by {book.borrower})
                         </option>
                       ))}
                   </select>
-                </div>
-                <button
+                </motion.div>
+                <motion.button
                   type="submit"
-                  className="w-full bg-[#2ecc71] text-white py-3 px-6 rounded-lg hover:bg-[#27ae60] transition-colors focus:outline-none focus:ring-2 focus:ring-[#2ecc71] focus:ring-offset-2"
+                  className="w-full bg-gradient-to-r from-accent to-accent-light hover:from-accent-dark hover:to-accent text-white py-3 px-6 rounded-lg transition-all duration-300 transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <i className="fas fa-check mr-2"></i>
                   Return Book
-                </button>
+                </motion.button>
               </form>
-            </div>
+            </motion.div>
 
-            <div className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+            <motion.div 
+              variants={itemVariants}
+              className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+            >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <i className="fas fa-list text-[#9b59b6] text-2xl mr-3"></i>
-                  <h2 className="text-2xl font-semibold text-[#2c3e50]">
+                  <motion.i 
+                    className="fas fa-list text-secondary dark:text-secondary-light text-2xl mr-3"
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  ></motion.i>
+                  <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
                     Book Status
                   </h2>
                 </div>
                 <div className="flex space-x-4 text-sm">
                   <span className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-[#2ecc71] mr-2"></div>
-                    Available
+                    <motion.div 
+                      className="w-3 h-3 rounded-full bg-accent dark:bg-accent-light mr-2"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    ></motion.div>
+                    <span className="text-gray-600 dark:text-gray-400">Available</span>
                   </span>
                   <span className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-[#f1c40f] mr-2"></div>
-                    Borrowed
+                    <motion.div 
+                      className="w-3 h-3 rounded-full bg-secondary dark:bg-secondary-light mr-2"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+                    ></motion.div>
+                    <span className="text-gray-600 dark:text-gray-400">Borrowed</span>
                   </span>
                   <span className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-[#e74c3c] mr-2"></div>
-                    Overdue
+                    <motion.div 
+                      className="w-3 h-3 rounded-full bg-red-500 dark:bg-red-400 mr-2"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
+                    ></motion.div>
+                    <span className="text-gray-600 dark:text-gray-400">Overdue</span>
                   </span>
                 </div>
               </div>
-              <div className="space-y-4">
-                {books?.map((book) => {
-                  const borrow = borrowRecords?.find(
-                    (b) => b.bookId === book.id && b.status === "borrowed"
-                  );
-                  const isOverdue =
-                    borrow && new Date(borrow.dueDate) < new Date();
+              <AnimatePresence>
+                <motion.div className="space-y-4">
+                  {books?.map((book) => {
+                    const borrow = borrowRecords?.find(
+                      (b) => b.bookId === book.id && b.status === "borrowed"
+                    );
+                    const isOverdue = borrow && new Date(borrow.dueDate) < new Date();
 
-                  return (
-                    <div
-                      key={book.id}
-                      className="flex justify-between items-start p-4 rounded-lg border border-[#dfe6e9] hover:border-[#3498db] transition-colors"
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <i className="fas fa-book text-[#7f8c8d]"></i>
-                          <span className="font-medium text-[#2c3e50]">
-                            {book.title}
-                          </span>
-                        </div>
-                        <div className="text-[#7f8c8d]">by {book.author}</div>
-                        {borrow && (
-                          <div className="text-sm space-y-1 text-[#7f8c8d]">
-                            <div className="flex items-center">
-                              <i className="fas fa-clock w-5"></i>
-                              Borrowed:{" "}
-                              {new Date(borrow.borrowDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit'
-                              })}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-calendar-alt w-5"></i>
-                              Due: {new Date(borrow.dueDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit'
-                              })}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-user w-5"></i>
-                              {book.borrower}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-id-card w-5"></i>
-                              {book.gr_number}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-graduation-cap w-5"></i>
-                              {book.class_name}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          book.status === "available"
-                            ? "bg-[#2ecc71]/10 text-[#2ecc71]"
-                            : isOverdue
-                            ? "bg-[#e74c3c]/10 text-[#e74c3c]"
-                            : "bg-[#f1c40f]/10 text-[#f1c40f]"
-                        }`}
+                    return (
+                      <motion.div
+                        key={book.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="flex justify-between items-start p-4 rounded-lg border border-gray-300 dark:border-gray-600 hover:border-primary dark:hover:border-primary-light bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm transition-all duration-300"
                       >
-                        {isOverdue ? "overdue" : book.status}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <motion.i 
+                              className="fas fa-book text-primary dark:text-primary-light"
+                              whileHover={{ rotate: 360 }}
+                              transition={{ duration: 0.5 }}
+                            ></motion.i>
+                            <span className="font-medium text-gray-800 dark:text-gray-200">
+                              {book.title}
+                            </span>
+                          </div>
+                          <div className="text-gray-600 dark:text-gray-400">by {book.author}</div>
+                          {borrow && (
+                            <div className="text-sm space-y-1 text-gray-600 dark:text-gray-400">
+                              <div className="flex items-center">
+                                <i className="fas fa-clock w-5"></i>
+                                Borrowed:{" "}
+                                {new Date(borrow.borrowDate).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: '2-digit'
+                                })}
+                              </div>
+                              <div className="flex items-center">
+                                <i className="fas fa-calendar-alt w-5"></i>
+                                Due:{" "}
+                                {new Date(borrow.dueDate).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: '2-digit'
+                                })}
+                              </div>
+                              <div className="flex items-center">
+                                <i className="fas fa-user w-5"></i>
+                                {book.borrower}
+                              </div>
+                              <div className="flex items-center">
+                                <i className="fas fa-id-card w-5"></i>
+                                {book.gr_number}
+                              </div>
+                              <div className="flex items-center">
+                                <i className="fas fa-graduation-cap w-5"></i>
+                                {book.class_name}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <motion.div
+                          className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            book.status === "available"
+                              ? "bg-accent/10 dark:bg-accent-light/10 text-accent dark:text-accent-light"
+                              : isOverdue
+                              ? "bg-red-500/10 dark:bg-red-400/10 text-red-500 dark:text-red-400"
+                              : "bg-secondary/10 dark:bg-secondary-light/10 text-secondary dark:text-secondary-light"
+                          }`}
+                          whileHover={{ scale: 1.05 }}
+                        >
+                          {isOverdue ? "overdue" : book.status}
+                        </motion.div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              </AnimatePresence>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
