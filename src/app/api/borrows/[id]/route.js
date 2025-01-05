@@ -4,16 +4,17 @@ import prisma from "../../../../lib/prisma";
 export async function PUT(request, { params }) {
   try {
     const { id } = params;
+    const { status, returnDate } = await request.json();
     console.log("Updating borrow record ID:", id);
     
-    // Update the borrow record directly using its ID
+    // Update the borrow record with return date
     const updatedBorrow = await prisma.borrow.update({
       where: { 
         id: parseInt(id)
       },
       data: {
-        status: "returned",
-        returnDate: new Date()
+        status,
+        returnDate: returnDate ? new Date(returnDate) : new Date()
       }
     });
 
@@ -21,9 +22,6 @@ export async function PUT(request, { params }) {
     return NextResponse.json(updatedBorrow);
   } catch (error) {
     console.error('Return book error:', error);
-    return NextResponse.json({ 
-      error: error.message,
-      details: error.stack 
-    }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 } 
