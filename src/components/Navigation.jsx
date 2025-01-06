@@ -21,6 +21,7 @@ export default function Navigation() {
     { href: "/dashboard", label: "Dashboard", icon: "fas fa-chart-line" },
     { href: "/books", label: "Books", icon: "fas fa-book" },
     { href: "/borrows", label: "Borrows", icon: "fas fa-hand-holding-heart" },
+    { href: "/reports", label: "Reports", icon: "fas fa-file-alt" },
   ];
 
   return (

@@ -18,6 +18,15 @@ export async function PUT(request, { params }) {
       }
     });
 
+    // Create a transaction record for the return
+    await prisma.transaction.create({
+      data: {
+        borrowId: parseInt(id),
+        type: "return",
+        status: "completed"
+      }
+    });
+
     console.log("Updated borrow record:", updatedBorrow);
     return NextResponse.json(updatedBorrow);
   } catch (error) {

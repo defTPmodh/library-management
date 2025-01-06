@@ -18,6 +18,8 @@ export async function POST(request) {
   try {
     const borrowData = await request.json();
     console.log("API: Creating new borrow:", borrowData);
+
+    // Create the borrow record
     const newBorrow = await prisma.borrow.create({
       data: {
         bookId: parseInt(borrowData.bookId),
@@ -30,6 +32,16 @@ export async function POST(request) {
       },
       include: { book: true }
     });
+
+    // Create a transaction record for the borrow
+    await prisma.transaction.create({
+      data: {
+        borrowId: newBorrow.id,
+        type: "borrow",
+        status: "completed"
+      }
+    });
+
     return NextResponse.json(newBorrow);
   } catch (error) {
     console.error("API: Error creating borrow:", error);

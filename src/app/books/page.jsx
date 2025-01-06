@@ -22,6 +22,7 @@ function BooksPage() {
   const [books, setBooks] = useState([]);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
+  const [bookId, setBookId] = useState("");
   const [genre, setGenre] = useState("Fiction");
   const [selectedGenreFilter, setSelectedGenreFilter] = useState("All");
   const [loading, setLoading] = useState(true);
@@ -117,7 +118,7 @@ function BooksPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !author) return;
+    if (!title || !author || !bookId) return;
 
     try {
       const dbName = localStorage.getItem("databaseName");
@@ -129,8 +130,8 @@ function BooksPage() {
         },
         body: JSON.stringify({
           query:
-            "INSERT INTO `books` (title, author, genre, status) VALUES (?, ?, ?, 'available')",
-          values: [title, author, genre],
+            "INSERT INTO `books` (id, title, author, genre, status) VALUES (?, ?, ?, ?, 'available')",
+          values: [bookId, title, author, genre],
         }),
       });
 
@@ -142,6 +143,7 @@ function BooksPage() {
       console.log("Added book:", result); // Debug log
 
       fetchBooks(dbName);
+      setBookId("");
       setTitle("");
       setAuthor("");
       setGenre("Fiction"); // Reset to default genre
@@ -271,6 +273,15 @@ function BooksPage() {
             <motion.div className="mb-4" variants={itemVariants}>
               <input
                 type="text"
+                value={bookId}
+                onChange={(e) => setBookId(e.target.value)}
+                placeholder="Book ID"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+              />
+            </motion.div>
+            <motion.div className="mb-4" variants={itemVariants}>
+              <input
+                type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Book Title"
@@ -348,7 +359,10 @@ function BooksPage() {
                     className="flex justify-between items-center border-b border-gray-300 dark:border-gray-600 pb-2"
                   >
                     <div>
-                      <h3 className="font-semibold text-gray-800 dark:text-gray-200">{book.title}</h3>
+                      <h3 className="font-semibold text-gray-800 dark:text-gray-200">
+                        <span className="text-primary dark:text-primary-light mr-2">#{book.id}</span>
+                        {book.title}
+                      </h3>
                       <p className="text-gray-600 dark:text-gray-400">by {book.author}</p>
                       <div className="flex space-x-2">
                         <span
