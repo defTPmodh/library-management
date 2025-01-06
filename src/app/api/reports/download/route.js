@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import ExcelJS from 'exceljs';
-
-const prisma = new PrismaClient();
 
 export async function POST(request) {
   try {
@@ -18,105 +16,129 @@ export async function POST(request) {
     const worksheet = workbook.addWorksheet('Report');
 
     if (reportType === 'accession') {
-      // Fetch activities for the selected month with book details
-      const activities = await prisma.activity.findMany({
-        where: {
-          timestamp: {
-            gte: startDate,
-            lte: endDate
+      try {
+        // Fetch activities for the selected month with book details
+        const activities = await prisma.activity.findMany({
+          where: {
+            timestamp: {
+              gte: startDate,
+              lte: endDate
+            }
+          },
+          include: {
+            book: true
+          },
+          orderBy: {
+            timestamp: 'asc'
           }
-        },
-        include: {
-          book: true
-        },
-        orderBy: {
-          timestamp: 'asc'
-        }
-      });
-
-      // Set up headers for accession register
-      worksheet.columns = [
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Time', key: 'time', width: 12 },
-        { header: 'Action', key: 'action', width: 20 },
-        { header: 'Book Title', key: 'bookTitle', width: 40 },
-        { header: 'Author', key: 'author', width: 30 },
-        { header: 'Genre', key: 'genre', width: 20 },
-        { header: 'Library', key: 'library', width: 15 },
-        { header: 'Status', key: 'status', width: 15 },
-        { header: 'Details', key: 'details', width: 40 }
-      ];
-
-      // Add data rows
-      activities.forEach(activity => {
-        const date = new Date(activity.timestamp);
-        worksheet.addRow({
-          date: date.toLocaleDateString('en-GB'),
-          time: date.toLocaleTimeString('en-GB'),
-          action: activity.action,
-          bookTitle: activity.book?.title || activity.bookTitle || 'N/A',
-          author: activity.book?.author || activity.bookAuthor || 'N/A',
-          genre: activity.book?.genre || 'N/A',
-          library: activity.book?.library || activity.library || 'N/A',
-          status: activity.book?.status || 'N/A',
-          details: activity.details || 'N/A'
         });
-      });
+
+        console.log('Fetched activities:', activities.length);
+
+        // Set up headers for accession register
+        worksheet.columns = [
+          { header: 'Date', key: 'date', width: 15 },
+          { header: 'Time', key: 'time', width: 12 },
+          { header: 'Action', key: 'action', width: 20 },
+          { header: 'Book Title', key: 'bookTitle', width: 40 },
+          { header: 'Author', key: 'author', width: 30 },
+          { header: 'Genre', key: 'genre', width: 20 },
+          { header: 'Library', key: 'library', width: 15 },
+          { header: 'Status', key: 'status', width: 15 },
+          { header: 'Details', key: 'details', width: 40 }
+        ];
+
+        // Add data rows
+        activities.forEach((activity, index) => {
+          try {
+            const date = new Date(activity.timestamp);
+            worksheet.addRow({
+              date: date.toLocaleDateString('en-GB'),
+              time: date.toLocaleTimeString('en-GB'),
+              action: activity.action || 'N/A',
+              bookTitle: activity.book?.title || activity.bookTitle || 'N/A',
+              author: activity.book?.author || activity.bookAuthor || 'N/A',
+              genre: activity.book?.genre || 'N/A',
+              library: activity.book?.library || activity.library || 'N/A',
+              status: activity.book?.status || 'N/A',
+              details: activity.details || 'N/A'
+            });
+          } catch (rowError) {
+            console.error(`Error adding row ${index}:`, rowError);
+          }
+        });
+
+      } catch (activityError) {
+        console.error('Error fetching activities:', activityError);
+        throw activityError;
+      }
 
     } else if (reportType === 'transactions') {
-      // Fetch transactions for the selected month with book and student details
-      const transactions = await prisma.transaction.findMany({
-        where: {
-          timestamp: {
-            gte: startDate,
-            lte: endDate
+      try {
+        // Fetch transactions for the selected month with book and student details
+        const transactions = await prisma.transaction.findMany({
+          where: {
+            timestamp: {
+              gte: startDate,
+              lte: endDate
+            }
+          },
+          include: {
+            book: true,
+            borrow: true
+          },
+          orderBy: {
+            timestamp: 'asc'
           }
-        },
-        include: {
-          book: true,
-          borrow: true
-        },
-        orderBy: {
-          timestamp: 'asc'
-        }
-      });
-
-      // Set up headers for transaction report
-      worksheet.columns = [
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Time', key: 'time', width: 12 },
-        { header: 'Type', key: 'type', width: 15 },
-        { header: 'Book Title', key: 'bookTitle', width: 40 },
-        { header: 'Author', key: 'author', width: 30 },
-        { header: 'Genre', key: 'genre', width: 20 },
-        { header: 'Library', key: 'library', width: 15 },
-        { header: 'Student ID', key: 'studentId', width: 15 },
-        { header: 'Student Name', key: 'studentName', width: 25 },
-        { header: 'Class', key: 'class', width: 15 },
-        { header: 'Due Date', key: 'dueDate', width: 15 },
-        { header: 'Return Date', key: 'returnDate', width: 15 },
-        { header: 'Status', key: 'status', width: 15 }
-      ];
-
-      // Add data rows
-      transactions.forEach(transaction => {
-        const date = new Date(transaction.timestamp);
-        worksheet.addRow({
-          date: date.toLocaleDateString('en-GB'),
-          time: date.toLocaleTimeString('en-GB'),
-          type: transaction.type,
-          bookTitle: transaction.book?.title || 'N/A',
-          author: transaction.book?.author || 'N/A',
-          genre: transaction.book?.genre || 'N/A',
-          library: transaction.book?.library || 'N/A',
-          studentId: transaction.studentId || 'N/A',
-          studentName: transaction.studentName || 'N/A',
-          class: transaction.borrow?.className || 'N/A',
-          dueDate: transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString('en-GB') : 'N/A',
-          returnDate: transaction.returnDate ? new Date(transaction.returnDate).toLocaleDateString('en-GB') : 'N/A',
-          status: transaction.status || 'N/A'
         });
-      });
+
+        console.log('Fetched transactions:', transactions.length);
+
+        // Set up headers for transaction report
+        worksheet.columns = [
+          { header: 'Date', key: 'date', width: 15 },
+          { header: 'Time', key: 'time', width: 12 },
+          { header: 'Type', key: 'type', width: 15 },
+          { header: 'Book Title', key: 'bookTitle', width: 40 },
+          { header: 'Author', key: 'author', width: 30 },
+          { header: 'Genre', key: 'genre', width: 20 },
+          { header: 'Library', key: 'library', width: 15 },
+          { header: 'Student ID', key: 'studentId', width: 15 },
+          { header: 'Student Name', key: 'studentName', width: 25 },
+          { header: 'Class', key: 'class', width: 15 },
+          { header: 'Due Date', key: 'dueDate', width: 15 },
+          { header: 'Return Date', key: 'returnDate', width: 15 },
+          { header: 'Status', key: 'status', width: 15 }
+        ];
+
+        // Add data rows
+        transactions.forEach((transaction, index) => {
+          try {
+            const date = new Date(transaction.timestamp);
+            worksheet.addRow({
+              date: date.toLocaleDateString('en-GB'),
+              time: date.toLocaleTimeString('en-GB'),
+              type: transaction.type || 'N/A',
+              bookTitle: transaction.book?.title || 'N/A',
+              author: transaction.book?.author || 'N/A',
+              genre: transaction.book?.genre || 'N/A',
+              library: transaction.book?.library || 'N/A',
+              studentId: transaction.studentId || 'N/A',
+              studentName: transaction.studentName || 'N/A',
+              class: transaction.borrow?.className || 'N/A',
+              dueDate: transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString('en-GB') : 'N/A',
+              returnDate: transaction.returnDate ? new Date(transaction.returnDate).toLocaleDateString('en-GB') : 'N/A',
+              status: transaction.status || 'N/A'
+            });
+          } catch (rowError) {
+            console.error(`Error adding row ${index}:`, rowError);
+          }
+        });
+
+      } catch (transactionError) {
+        console.error('Error fetching transactions:', transactionError);
+        throw transactionError;
+      }
     }
 
     // Style the header row
@@ -160,11 +182,17 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Error generating report:', error);
-    return new NextResponse(JSON.stringify({ error: 'Failed to generate report' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
+    return new NextResponse(
+      JSON.stringify({ 
+        error: 'Failed to generate report',
+        details: error.message 
+      }), 
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       }
-    });
+    );
   }
 } 
