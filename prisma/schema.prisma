@@ -35,7 +35,7 @@ model Borrow {
   returnDate   DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  book         Book      @relation(fields: [bookId], references: [id])
+  book         Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 }
 
@@ -53,7 +53,7 @@ model Activity {
   action    String
   bookId    Int
   userId    String
-  book      Book     @relation(fields: [bookId], references: [id])
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [empId])
 }
 
@@ -63,5 +63,5 @@ model Transaction {
   borrowId     Int
   type         String   // "borrow" or "return"
   status       String   // "completed", "pending", "overdue"
-  borrow       Borrow   @relation(fields: [borrowId], references: [id])
+  borrow       Borrow   @relation(fields: [borrowId], references: [id], onDelete: Cascade)
 }

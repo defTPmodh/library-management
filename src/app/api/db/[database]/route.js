@@ -30,10 +30,49 @@ export async function POST(request, { params }) {
     }
     else if (query.includes("DELETE")) {
       const [id] = values;
-      await prisma.book.delete({
-        where: { id: parseInt(id) }
-      });
-      return NextResponse.json({ success: true });
+      console.log("Attempting to delete book with ID:", id);
+      
+      try {
+        // Delete all related records
+        console.log("Deleting related transactions...");
+        const deletedTransactions = await prisma.transaction.deleteMany({
+          where: {
+            borrow: {
+              bookId: parseInt(id)
+            }
+          }
+        });
+        console.log("Deleted transactions:", deletedTransactions.count);
+
+        console.log("Deleting related borrows...");
+        const deletedBorrows = await prisma.borrow.deleteMany({
+          where: {
+            bookId: parseInt(id)
+          }
+        });
+        console.log("Deleted borrows:", deletedBorrows.count);
+
+        console.log("Deleting related activities...");
+        const deletedActivities = await prisma.activity.deleteMany({
+          where: {
+            bookId: parseInt(id)
+          }
+        });
+        console.log("Deleted activities:", deletedActivities.count);
+
+        console.log("Deleting book...");
+        const deletedBook = await prisma.book.delete({
+          where: {
+            id: parseInt(id)
+          }
+        });
+        console.log("Successfully deleted book:", deletedBook);
+
+        return NextResponse.json({ success: true, deletedBook });
+      } catch (deleteError) {
+        console.error("Error in deletion process:", deleteError);
+        throw deleteError; // Re-throw to be caught by outer try-catch
+      }
     }
     else if (query.includes("UPDATE")) {
       console.log("Update values:", values);
@@ -77,4 +116,8 @@ export async function POST(request, { params }) {
     console.error("Database error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+export async function DELETE(request, { params }) {
+  return NextResponse.json({ error: "Please use POST method for deletion" }, { status: 405 });
 } 

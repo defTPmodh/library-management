@@ -155,16 +155,26 @@ function BooksPage() {
   const handleDelete = async (id) => {
     try {
       const dbName = localStorage.getItem("databaseName");
-      await fetch(`/api/db/${dbName}`, {
-        method: "POST",
+      const response = await fetch(`/api/db/${dbName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          query: "DELETE FROM `books` WHERE id = ?",
-          values: [id],
-        }),
+          query: 'DELETE FROM `books` WHERE id = ?',
+          values: [id]
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete book');
+      }
+
+      // Refresh the books list
       fetchBooks(dbName);
     } catch (error) {
       console.error("Error deleting book:", error);
+      alert("Failed to delete book. Make sure there are no active borrows for this book.");
     }
   };
 
