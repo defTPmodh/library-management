@@ -9,23 +9,55 @@ export async function POST(request, { params }) {
 
     if (query.includes("SELECT")) {
       const books = await prisma.book.findMany({
-        where: { library }
+        where: { library },
+        orderBy: {
+          id: 'asc'
+        }
       });
       return NextResponse.json(books);
     } 
     else if (query.includes("INSERT")) {
       const [title, author, genre] = values;
-      console.log("Creating book with genre:", genre); // Debug log
+      console.log("Creating book with genre:", genre);
+
+      // Find the lowest available ID
+      const existingBooks = await prisma.book.findMany({
+        where: { library },
+        select: { id: true },
+        orderBy: { id: 'asc' }
+      });
+      
+      // Find the first gap in the sequence or use next number
+      let newId = 1;
+      for (const book of existingBooks) {
+        if (book.id !== newId) {
+          break;
+        }
+        newId++;
+      }
+
+      // Create the book with the new ID
       const newBook = await prisma.book.create({
         data: {
+          id: newId,
           title,
           author,
-          genre: genre || "Uncategorized", // Ensure genre is set
+          genre: genre || "Uncategorized",
           library,
           status: "available"
         }
       });
-      console.log("Created book:", newBook); // Debug log
+      console.log("Created book:", newBook);
+
+      // Create activity record for the new book
+      await prisma.activity.create({
+        data: {
+          action: "Book added through website",
+          bookId: newBook.id,
+          userId: library === "Girls Library" ? "GIRLS001" : "BOYS001" // Use appropriate staff ID
+        }
+      });
+
       return NextResponse.json(newBook);
     }
     else if (query.includes("DELETE")) {
@@ -33,45 +65,99 @@ export async function POST(request, { params }) {
       console.log("Attempting to delete book with ID:", id);
       
       try {
-        // Delete all related records
-        console.log("Deleting related transactions...");
-        const deletedTransactions = await prisma.transaction.deleteMany({
-          where: {
-            borrow: {
-              bookId: parseInt(id)
+        // Start a transaction to ensure all operations are atomic
+        await prisma.$transaction(async (tx) => {
+          // Get all books to determine the order
+          const allBooks = await tx.book.findMany({
+            where: { library },
+            orderBy: { id: 'asc' }
+          });
+
+          // Find the book to delete
+          const bookToDelete = allBooks.find(b => b.id === parseInt(id));
+          if (!bookToDelete) {
+            throw new Error("Book not found");
+          }
+
+          // Delete all related records for all books (we'll recreate them)
+          await tx.transaction.deleteMany({
+            where: {
+              borrow: {
+                book: {
+                  library
+                }
+              }
             }
+          });
+
+          await tx.borrow.deleteMany({
+            where: {
+              book: {
+                library
+              }
+            }
+          });
+
+          await tx.activity.deleteMany({
+            where: {
+              book: {
+                library
+              }
+            }
+          });
+
+          // Delete all books
+          await tx.book.deleteMany({
+            where: { library }
+          });
+
+          // Get books to recreate (excluding the deleted one)
+          const booksToRecreate = allBooks
+            .filter(b => b.id !== parseInt(id))
+            .sort((a, b) => a.id - b.id);
+
+          // Recreate books with new sequential IDs
+          let newId = 1;
+          for (const book of booksToRecreate) {
+            const recreatedBook = await tx.book.create({
+              data: {
+                id: newId,
+                title: book.title,
+                author: book.author,
+                genre: book.genre,
+                status: book.status,
+                library: book.library,
+                borrower: book.borrower,
+                gr_number: book.gr_number,
+                class_name: book.class_name
+              }
+            });
+
+            // Create activity record for the recreated book
+            await tx.activity.create({
+              data: {
+                action: "Book recreated during reordering",
+                bookId: recreatedBook.id,
+                userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
+              }
+            });
+
+            newId++;
           }
         });
-        console.log("Deleted transactions:", deletedTransactions.count);
 
-        console.log("Deleting related borrows...");
-        const deletedBorrows = await prisma.borrow.deleteMany({
-          where: {
-            bookId: parseInt(id)
-          }
+        return NextResponse.json({ 
+          success: true,
+          message: "Book successfully deleted and IDs reordered"
         });
-        console.log("Deleted borrows:", deletedBorrows.count);
-
-        console.log("Deleting related activities...");
-        const deletedActivities = await prisma.activity.deleteMany({
-          where: {
-            bookId: parseInt(id)
-          }
-        });
-        console.log("Deleted activities:", deletedActivities.count);
-
-        console.log("Deleting book...");
-        const deletedBook = await prisma.book.delete({
-          where: {
-            id: parseInt(id)
-          }
-        });
-        console.log("Successfully deleted book:", deletedBook);
-
-        return NextResponse.json({ success: true, deletedBook });
       } catch (deleteError) {
         console.error("Error in deletion process:", deleteError);
-        throw deleteError; // Re-throw to be caught by outer try-catch
+        return NextResponse.json({ 
+          error: "Failed to delete book", 
+          details: deleteError.message 
+        }, { 
+          status: 500 
+        });
       }
     }
     else if (query.includes("UPDATE")) {
