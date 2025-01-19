@@ -101,15 +101,29 @@ function BooksPage() {
     }
   };
 
-  const fetchBooks = async (dbName) => {
+  const fetchBooks = async () => {
     try {
+      const dbName = localStorage.getItem("databaseName");
+      const library = localStorage.getItem("libraryName");
+      console.log("Fetching books for library:", library);
+      
       const response = await fetch(`/api/db/${dbName}`, {
-        method: "POST",
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          query: "SELECT * FROM `books`",
-        }),
+          query: "SELECT * FROM `books`"
+        })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch books');
+      }
+      
       const data = await response.json();
+      console.log("Received books:", data);
       setBooks(data);
     } catch (error) {
       console.error("Error fetching books:", error);
@@ -122,31 +136,32 @@ function BooksPage() {
 
     try {
       const dbName = localStorage.getItem("databaseName");
-      console.log("Adding book with genre:", genre); // Debug log
+      console.log("Adding book with genre:", genre);
+      
       const response = await fetch(`/api/db/${dbName}`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query:
-            "INSERT INTO `books` (id, title, author, genre, status) VALUES (?, ?, ?, ?, 'available')",
-          values: [bookId, title, author, genre],
+          query: "INSERT INTO `books` (id, title, author, genre, status) VALUES (?, ?, ?, ?, 'available')",
+          values: [bookId, title, author, genre]
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add book');
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to add book');
       }
 
       const result = await response.json();
-      console.log("Added book:", result); // Debug log
+      console.log("Added book:", result);
 
-      fetchBooks(dbName);
+      fetchBooks();
       setBookId("");
       setTitle("");
       setAuthor("");
-      setGenre("Fiction"); // Reset to default genre
+      setGenre("Fiction");
     } catch (error) {
       console.error("Error adding book:", error);
     }
@@ -167,11 +182,11 @@ function BooksPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete book');
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to delete book');
       }
 
-      // Refresh the books list
-      fetchBooks(dbName);
+      fetchBooks();
     } catch (error) {
       console.error("Error deleting book:", error);
       alert("Failed to delete book. Make sure there are no active borrows for this book.");
