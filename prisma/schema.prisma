@@ -8,19 +8,19 @@ datasource db {
 }
 
 model Book {
-  id         Int      @id @default(autoincrement())
-  title      String
-  author     String
-  status     String   @default("available")
-  borrower   String?
-  gr_number  String?
-  class_name String?
-  library    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  genre      String   @default("Uncategorized")
-  borrows    Borrow[]
-  activities Activity[]
+  id          Int      @id
+  acc_no      String?
+  class_no    String?
+  title       String
+  author      String
+  publisher   String?
+  status      String   @default("available")
+  library     String
+  genre       String   @default("Uncategorized")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  borrows     Borrow[]
+  activities  Activity[]
 }
 
 model Borrow {
