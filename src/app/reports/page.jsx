@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Navigation from "../../components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import ExcelJS from "exceljs";
 
 function ReportsPage() {
   const [activeTab, setActiveTab] = useState("accession");
@@ -158,6 +159,100 @@ function ReportsPage() {
     }
   };
 
+  const handleDownloadAccessionRegister = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Accession Register');
+
+      // Define columns with all the fields in the correct order
+      worksheet.columns = [
+        { header: 'Acc. No.', key: 'acc_no', width: 15 },
+        { header: 'Class No.', key: 'class_no', width: 15 },
+        { header: 'Title', key: 'title', width: 40 },
+        { header: 'Author', key: 'author', width: 25 },
+        { header: 'Publisher', key: 'publisher', width: 25 },
+        { header: 'Genre', key: 'genre', width: 15 }
+      ];
+
+      // Fetch books data
+      const dbName = localStorage.getItem("databaseName");
+      const response = await fetch(`/api/db/${dbName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: "SELECT * FROM books ORDER BY acc_no ASC",
+          values: []
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch books data');
+      }
+
+      const books = await response.json();
+
+      // Sort books by accession number if available
+      const sortedBooks = books.sort((a, b) => {
+        if (!a.acc_no) return 1;
+        if (!b.acc_no) return -1;
+        return a.acc_no.localeCompare(b.acc_no);
+      });
+
+      // Add books data to worksheet
+      sortedBooks.forEach(book => {
+        worksheet.addRow({
+          acc_no: book.acc_no || '',
+          class_no: book.class_no || '',
+          title: book.title,
+          author: book.author,
+          publisher: book.publisher || '',
+          genre: book.genre
+        });
+      });
+
+      // Style the header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // Add borders and align text
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        });
+      });
+
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const libraryName = localStorage.getItem("libraryName") || "Library";
+      a.href = url;
+      a.download = `${libraryName}_accession_register_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Error generating accession register:', error);
+      alert('Failed to generate accession register. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background dark:bg-background-dark flex justify-center items-center">
@@ -269,9 +364,15 @@ function ReportsPage() {
                   <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
                     Accession Register
                   </h2>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Total Entries: {filteredActivities.length}
-                  </p>
+                  <motion.button
+                    onClick={handleDownloadAccessionRegister}
+                    className="flex items-center space-x-2 px-4 py-2 bg-primary hover:bg-primary-dark dark:bg-primary-light dark:hover:bg-primary text-white rounded-lg transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <i className="fas fa-download"></i>
+                    <span>Download Accession Register</span>
+                  </motion.button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
