@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import Navigation from "../../components/Navigation";
 import { motion } from "framer-motion";
+import BookDetailsModal from "../../components/BookDetailsModal";
+import ExcelJS from "exceljs";
 
 // Predefined list of genres
 const GENRES = [
@@ -33,6 +35,10 @@ function BooksPage() {
     available: 0,
     genreCounts: {}
   });
+  const [accNo, setAccNo] = useState("");
+  const [classNo, setClassNo] = useState("");
+  const [publisher, setPublisher] = useState("");
+  const [selectedBook, setSelectedBook] = useState(null);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -136,7 +142,15 @@ function BooksPage() {
 
     try {
       const dbName = localStorage.getItem("databaseName");
-      console.log("Adding book with genre:", genre);
+      console.log("Adding book with:", {
+        bookId,
+        accNo,
+        classNo,
+        title,
+        author,
+        publisher,
+        genre
+      });
       
       const response = await fetch(`/api/db/${dbName}`, {
         method: 'POST',
@@ -144,26 +158,31 @@ function BooksPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: "INSERT INTO `books` (id, title, author, genre, status) VALUES (?, ?, ?, ?, 'available')",
-          values: [bookId, title, author, genre]
+          query: "INSERT INTO `books` (id, acc_no, class_no, title, author, publisher, genre, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'available')",
+          values: [parseInt(bookId), accNo, classNo, title, author, publisher, genre]
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to add book');
+        throw new Error(data.details || data.error || 'Failed to add book');
       }
 
-      const result = await response.json();
-      console.log("Added book:", result);
-
-      fetchBooks();
+      console.log("Book added successfully:", data);
+      await fetchBooks();
+      
+      // Reset form
       setBookId("");
+      setAccNo("");
+      setClassNo("");
       setTitle("");
       setAuthor("");
+      setPublisher("");
       setGenre("Fiction");
     } catch (error) {
       console.error("Error adding book:", error);
+      alert(error.message); // Show error to user
     }
   };
 
@@ -191,6 +210,55 @@ function BooksPage() {
       console.error("Error deleting book:", error);
       alert("Failed to delete book. Make sure there are no active borrows for this book.");
     }
+  };
+
+  const handleExportToExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Accession Register');
+
+    // Updated headers for all fields
+    worksheet.columns = [
+      { header: 'Acc. No.', key: 'acc_no', width: 15 },
+      { header: 'Class No.', key: 'class_no', width: 15 },
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Author', key: 'author', width: 20 },
+      { header: 'Publisher', key: 'publisher', width: 20 },
+      { header: 'Genre', key: 'genre', width: 15 }
+    ];
+
+    // Add all books to the worksheet
+    const filteredBooks = selectedGenreFilter === "All" 
+      ? books 
+      : books.filter(book => book.genre === selectedGenreFilter);
+
+    filteredBooks.forEach(book => {
+      worksheet.addRow({
+        acc_no: book.acc_no || '',
+        class_no: book.class_no || '',
+        title: book.title,
+        author: book.author,
+        publisher: book.publisher || '',
+        genre: book.genre
+      });
+    });
+
+    // Style the header row
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+
+    // Generate the file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${libraryName}_accession_register.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const filteredBooks = selectedGenreFilter === "All" 
@@ -307,6 +375,24 @@ function BooksPage() {
             <motion.div className="mb-4" variants={itemVariants}>
               <input
                 type="text"
+                value={accNo}
+                onChange={(e) => setAccNo(e.target.value)}
+                placeholder="Accession Number"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+              />
+            </motion.div>
+            <motion.div className="mb-4" variants={itemVariants}>
+              <input
+                type="text"
+                value={classNo}
+                onChange={(e) => setClassNo(e.target.value)}
+                placeholder="Class Number"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+              />
+            </motion.div>
+            <motion.div className="mb-4" variants={itemVariants}>
+              <input
+                type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Book Title"
@@ -319,6 +405,15 @@ function BooksPage() {
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
                 placeholder="Author Name"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+              />
+            </motion.div>
+            <motion.div className="mb-4" variants={itemVariants}>
+              <input
+                type="text"
+                value={publisher}
+                onChange={(e) => setPublisher(e.target.value)}
+                placeholder="Publisher"
                 className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
               />
             </motion.div>
@@ -376,14 +471,12 @@ function BooksPage() {
               </motion.p>
             ) : (
               <motion.ul className="space-y-4">
-                {filteredBooks.map((book, index) => (
+                {filteredBooks.map((book) => (
                   <motion.li
                     key={book.id}
-                    variants={itemVariants}
-                    custom={index}
-                    className="flex justify-between items-center border-b border-gray-300 dark:border-gray-600 pb-2"
+                    className="flex items-center justify-between bg-white/50 dark:bg-gray-800/50 p-4 rounded-lg shadow backdrop-blur-sm"
                   >
-                    <div>
+                    <div className="flex-1">
                       <h3 className="font-semibold text-gray-800 dark:text-gray-200">
                         <span className="text-primary dark:text-primary-light mr-2">#{book.id}</span>
                         {book.title}
@@ -404,14 +497,24 @@ function BooksPage() {
                         </span>
                       </div>
                     </div>
-                    <motion.button
-                      onClick={() => handleDelete(book.id)}
-                      className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </motion.button>
+                    <div className="flex space-x-2">
+                      <motion.button
+                        onClick={() => setSelectedBook(book)}
+                        className="text-primary dark:text-primary-light hover:text-primary-dark dark:hover:text-primary-light/80"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <i className="fas fa-info-circle"></i>
+                      </motion.button>
+                      <motion.button
+                        onClick={() => handleDelete(book.id)}
+                        className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <i className="fas fa-trash"></i>
+                      </motion.button>
+                    </div>
                   </motion.li>
                 ))}
               </motion.ul>
@@ -419,6 +522,11 @@ function BooksPage() {
           </motion.div>
         </div>
       </motion.div>
+
+      <BookDetailsModal 
+        book={selectedBook} 
+        onClose={() => setSelectedBook(null)} 
+      />
     </div>
   );
 }
