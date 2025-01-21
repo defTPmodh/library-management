@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import prisma from '../../../../lib/prisma';
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 export async function POST(request, { params }) {
   try {
@@ -12,20 +14,23 @@ export async function POST(request, { params }) {
     if (query.includes("SELECT")) {
       const books = await prisma.book.findMany({
         where: { library },
-        orderBy: { id: 'asc' },
-        include: {
-          borrows: {
-            where: { status: "borrowed" },
-            orderBy: { borrowDate: 'desc' },
-            take: 1
-          }
-        }
+        select: {
+          id: true,
+          acc_no: true,
+          class_no: true,
+          title: true,
+          author: true,
+          publisher: true,
+          genre: true,
+          status: true,
+          library: true
+        },
+        orderBy: { id: 'asc' }
       });
       return NextResponse.json(books);
     } 
     else if (query.includes("INSERT")) {
-      // Extract values and ensure bookId is a valid number
-      const [bookIdRaw, title, author, genre] = values;
+      const [bookIdRaw, accNo, classNo, title, author, publisher, genre] = values;
       const bookId = parseInt(bookIdRaw);
 
       if (isNaN(bookId)) {
@@ -35,10 +40,18 @@ export async function POST(request, { params }) {
         }, { status: 400 });
       }
 
-      console.log("Creating book with:", { bookId, title, author, genre, library });
+      console.log("Creating book with:", { 
+        bookId, 
+        accNo, 
+        classNo, 
+        title, 
+        author, 
+        publisher,
+        genre, 
+        library 
+      });
 
       try {
-        // Find if book ID already exists
         const existingBook = await prisma.book.findUnique({
           where: { id: bookId }
         });
@@ -50,12 +63,14 @@ export async function POST(request, { params }) {
           }, { status: 400 });
         }
 
-        // Create the book
         const newBook = await prisma.book.create({
           data: {
             id: bookId,
+            acc_no: accNo,
+            class_no: classNo,
             title,
             author,
+            publisher,
             genre: genre || "Uncategorized",
             library,
             status: "available"
