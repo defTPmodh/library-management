@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "../../../lib/prisma";
+import prisma from "../../lib/prisma";
 import * as XLSX from 'xlsx';
 
 export async function POST(request) {
@@ -8,90 +8,92 @@ export async function POST(request) {
     const file = formData.get('file');
     const library = formData.get('library');
 
-    // Get the employee ID based on the library
-    const employeeId = library === "Girls Library" ? "GIRLS001" : "BOYS001";
-
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    if (!file || !library) {
+      return NextResponse.json({ 
+        error: "Missing file or library" 
+      }, { status: 400 });
     }
 
     // Convert file buffer to array buffer
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array' });
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    // Get first worksheet
+    // Parse Excel file
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(worksheet, { 
-      raw: false,
-      header: ["title", "author", "genre"] // Map columns directly in order: Title, Author, Genre
-    });
-
-    // Remove the header row if it exists
-    if (data.length > 0 && data[0].title === "Title") {
-      data.shift();
-    }
-
-    // Validate data structure
-    if (!data.length) {
-      return NextResponse.json({ error: "Excel file is empty" }, { status: 400 });
-    }
-
-    // Map and validate the data
-    const books = data.map((row, index) => {
-      // Clean up the data by removing any extra spaces
-      const title = row.title?.toString().trim();
-      const author = row.author?.toString().trim();
-      const genre = row.genre?.toString().trim();
-
-      if (!title || !author) {
-        throw new Error(`Row ${index + 2}: Title and Author are required. Found Title: "${title}", Author: "${author}"`);
-      }
-
-      return {
-        title,
-        author,
-        genre: genre || "Uncategorized",
-        library,
-        status: "available"
-      };
-    });
-
-    // Import books in batches of 100
-    const batchSize = 100;
-    const results = [];
     
-    for (let i = 0; i < books.length; i += batchSize) {
-      const batch = books.slice(i, i + batchSize);
-      const createdBooks = await prisma.$transaction(
-        batch.map(book => 
-          prisma.book.create({
-            data: book
-          })
-        )
-      );
-      results.push(...createdBooks);
-    }
-
-    // Create activity records for the import
-    await prisma.activity.createMany({
-      data: results.map(book => ({
-        action: "Book imported from Excel",
-        bookId: book.id,
-        userId: employeeId // Use the actual employee ID
-      }))
+    // Convert to JSON with custom header mapping
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      header: ['date', 'accNo', 'classNo', 'subject', 'title', 'edition', 'author', 'publishers', 'pages', 'price', 'isbn', 'remark'],
+      range: 1  // Skip header row
     });
 
-    return NextResponse.json({
-      success: true,
-      importedCount: results.length,
-      message: `Successfully imported ${results.length} books.`
+    console.log('Parsed Excel data:', jsonData); // Debug log
+
+    // Process each row
+    const books = await Promise.all(jsonData.map(async (row) => {
+      try {
+        // Extract title from the format "Title (with Description)"
+        let title = row.title || '';
+        if (typeof title === 'string' && title.includes(':')) {
+          title = title.split(':')[0].trim();
+        }
+
+        // Format price to remove "Rs" and handle "(5 vols)" format
+        let priceStr = row.price ? row.price.toString() : '';
+        priceStr = priceStr.replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '').trim();
+
+        // Create book record
+        const book = await prisma.book.create({
+          data: {
+            acc_no: row.accNo?.toString(),
+            class_no: row.classNo?.toString(),
+            title: title || "Unknown Title",
+            author: row.author?.toString() || "Unknown Author",
+            publisher: row.publishers?.toString(),
+            status: "available",
+            library: library,
+            genre: row.subject?.toString() || "Uncategorized",
+            edition: row.edition?.toString(),
+            pages: row.pages?.toString(),
+            price: priceStr,
+            isbn: row.isbn?.toString(),
+            remarks: row.remark?.toString()
+          }
+        });
+
+        // Create activity record
+        await prisma.activity.create({
+          data: {
+            action: "Book imported",
+            bookId: book.id,
+            userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
+          }
+        });
+
+        console.log('Successfully imported book:', book); // Debug log
+        return book;
+      } catch (error) {
+        console.error(`Error importing book ${row.accNo}:`, error);
+        return null;
+      }
+    }));
+
+    // Filter out failed imports
+    const successfulImports = books.filter(book => book !== null);
+    console.log(`Total successful imports: ${successfulImports.length}`); // Debug log
+
+    return NextResponse.json({ 
+      message: `Successfully imported ${successfulImports.length} books`,
+      failedImports: books.length - successfulImports.length,
+      books: successfulImports 
     });
 
   } catch (error) {
     console.error("Error importing books:", error);
     return NextResponse.json({ 
       error: error.message,
-      hint: "Please ensure your Excel file has three columns in order: Title, Author, and Genre."
+      hint: "Please ensure your Excel file matches the required format with columns: Date, Acc. No., Class No., Subject, Title, Edition, Author, Publishers, Pages, Price, ISBN, Remark"
     }, { status: 500 });
   }
 } 
