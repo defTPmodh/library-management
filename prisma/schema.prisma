@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Book {
-  id          Int      @id
+  id          Int      @id @default(autoincrement())
   acc_no      String?
   class_no    String?
   title       String
@@ -17,6 +17,11 @@ model Book {
   status      String   @default("available")
   library     String
   genre       String   @default("Uncategorized")
+  edition     String?
+  pages       String?
+  price       String?
+  isbn        String?
+  remarks     String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   borrows     Borrow[]
@@ -40,10 +45,10 @@ model Borrow {
 }
 
 model User {
-  id       Int      @id @default(autoincrement())
-  empId    String   @unique
-  password String
-  library  String
+  id         Int        @id @default(autoincrement())
+  empId      String     @unique
+  password   String
+  library    String
   activities Activity[]
 }
 
@@ -58,10 +63,10 @@ model Activity {
 }
 
 model Transaction {
-  id           Int      @id @default(autoincrement())
-  date         DateTime @default(now())
-  borrowId     Int
-  type         String   // "borrow" or "return"
-  status       String   // "completed", "pending", "overdue"
-  borrow       Borrow   @relation(fields: [borrowId], references: [id], onDelete: Cascade)
+  id       Int      @id @default(autoincrement())
+  date     DateTime @default(now())
+  borrowId Int
+  type     String   // "borrow" or "return"
+  status   String   // "completed", "pending", "overdue"
+  borrow   Borrow   @relation(fields: [borrowId], references: [id], onDelete: Cascade)
 }
