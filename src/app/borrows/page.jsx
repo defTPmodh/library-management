@@ -64,15 +64,9 @@ function BorrowsPage() {
       const response = await fetch("/api/borrows");
       const data = await response.json();
       console.log("Fetched borrow records:", data);
-      if (data.length > 0) {
-        console.log("Sample borrow record structure:", data[0]);
-        console.log("Sample bookId type:", typeof data[0].bookId);
-        console.log("Sample bookId value:", data[0].bookId);
-      }
       setBorrowRecords(data);
     } catch (error) {
       console.error("Error fetching borrows:", error);
-      setBorrowRecords([]);
     }
   };
 
@@ -94,9 +88,8 @@ function BorrowsPage() {
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    const bookId = selectedBook;
+    const bookId = parseInt(selectedBook);
     const dbName = localStorage.getItem("databaseName");
-    const borrowDate = new Date().toISOString().split("T")[0];
 
     try {
       console.log("Checking out book:", {
@@ -106,59 +99,50 @@ function BorrowsPage() {
         className
       });
 
-      // First update the book status
-      const bookResponse = await fetch(`/api/db/${dbName}`, {
-        method: "POST",
-        body: JSON.stringify({
-          query:
-            "UPDATE `books` SET status = 'borrowed', borrower = ?, gr_number = ?, class_name = ? WHERE id = ?",
-          values: [borrowerName, grNumber, className, bookId],
-        }),
-      });
-
-      if (!bookResponse.ok) {
-        throw new Error('Failed to update book status');
-      }
-
-      // Then create the borrow record
+      // Create the borrow record first using Prisma API
       const borrowResponse = await fetch("/api/borrows", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json" 
+        },
         body: JSON.stringify({
           bookId,
           borrowerName,
           grNumber,
           className,
           status: "borrowed",
-          borrowDate,
-          dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
+          borrowDate: new Date().toISOString(),
+          dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
         }),
       });
 
       if (!borrowResponse.ok) {
-        throw new Error('Failed to create borrow record');
+        const errorData = await borrowResponse.json();
+        throw new Error(errorData.error || 'Failed to create borrow record');
       }
 
       // Refresh the data
       await Promise.all([fetchBorrows(), fetchBooks()]);
+      
+      // Reset form and close modal
       setBorrowerName("");
       setGrNumber("");
       setClassName("");
       setSelectedBook("");
+      setShowBorrowForm(false);
+
+      // Show success message
+      alert("Book checked out successfully!");
+
     } catch (error) {
       console.error("Error checking out book:", error);
+      alert(error.message || "Failed to check out book. Please try again.");
     }
   };
 
   const handleReturn = async (bookId) => {
     try {
-      const dbName = localStorage.getItem("databaseName");
-      console.log("Attempting to return book:", {
-        bookId,
-        dbName
-      });
+      console.log("Attempting to return book:", { bookId });
 
       // Find the active borrow record first
       const activeBorrow = borrowRecords.find(
@@ -166,51 +150,37 @@ function BorrowsPage() {
       );
 
       if (!activeBorrow) {
-        console.error("No active borrow record found for book:", bookId);
-        return;
+        throw new Error("No active borrow record found for this book");
       }
 
       console.log("Found active borrow:", activeBorrow);
 
-      // First update the book status to available
-      console.log("Updating book status...");
-      const bookResponse = await fetch(`/api/db/${dbName}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          query: "UPDATE books SET status = 'available', borrower = NULL, gr_number = NULL, class_name = NULL WHERE id = ?",
-          values: [bookId],
-        }),
-      });
-
-      if (!bookResponse.ok) {
-        throw new Error('Failed to update book status');
-      }
-
-      // Then update the borrow record
-      console.log("Updating borrow record...");
-      const borrowResponse = await fetch(`/api/borrows/${activeBorrow.id}`, {
+      // Update borrow record and book status through the API
+      const response = await fetch(`/api/borrows/${activeBorrow.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json" 
+        },
         body: JSON.stringify({ 
           status: "returned",
-          returnDate: new Date()
+          returnDate: new Date().toISOString()
         }),
       });
 
-      if (!borrowResponse.ok) {
-        throw new Error('Failed to update borrow record');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to return book');
       }
 
-      console.log("Return successful, refreshing data...");
       // Refresh both books and borrows data
       await Promise.all([fetchBooks(), fetchBorrows()]);
-      console.log("Data refresh complete");
+      
+      // Show success message
+      alert("Book returned successfully!");
 
     } catch (error) {
       console.error("Error returning book:", error);
+      alert(error.message || "Failed to return book. Please try again.");
     }
   };
 
@@ -332,7 +302,7 @@ function BorrowsPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                    className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-6 rounded-xl shadow-lg"
                   >
                     <div className="flex justify-between items-start">
                       <div className="space-y-2">
@@ -347,64 +317,35 @@ function BorrowsPage() {
                           </h3>
                         </div>
                         <p className="text-gray-600 dark:text-gray-400">by {book.author}</p>
-                        <div className="flex space-x-4">
-                          <span className="text-sm text-primary dark:text-primary-light">
-                            {book.genre}
-                          </span>
-                          <span className={`text-sm ${
-                            book.status === "available"
-                              ? "text-accent dark:text-accent-light"
-                              : isOverdue
-                              ? "text-red-500 dark:text-red-400"
-                              : "text-secondary dark:text-secondary-light"
-                          }`}>
-                            {isOverdue ? "Overdue" : book.status}
-                          </span>
-                        </div>
                         {borrow && (
                           <div className="text-sm space-y-1 text-gray-600 dark:text-gray-400">
-                            <div className="flex items-center">
-                              <i className="fas fa-user w-5"></i>
-                              {book.borrower}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-id-card w-5"></i>
-                              GR: {book.gr_number}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-graduation-cap w-5"></i>
-                              Class: {book.class_name}
-                            </div>
-                            <div className="flex items-center">
-                              <i className="fas fa-calendar-alt w-5"></i>
-                              Due: {new Date(borrow.dueDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit'
-                              })}
-                            </div>
+                            <p><span className="font-medium">Borrower:</span> {borrow.borrowerName}</p>
+                            <p><span className="font-medium">GR Number:</span> {borrow.grNumber}</p>
+                            <p><span className="font-medium">Class:</span> {borrow.className}</p>
+                            <p><span className="font-medium">Due Date:</span> {new Date(borrow.dueDate).toLocaleDateString()}</p>
+                            {isOverdue && (
+                              <p className="text-red-500">OVERDUE</p>
+                            )}
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center space-x-4">
+                      <div>
                         {book.status === "available" ? (
                           <motion.button
                             onClick={() => handleBorrowClick(book)}
-                            className="bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white px-6 py-2 rounded-lg transition-all duration-300"
+                            className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <i className="fas fa-hand-holding-heart mr-2"></i>
                             Borrow
                           </motion.button>
                         ) : (
                           <motion.button
                             onClick={() => handleReturn(book.id)}
-                            className="bg-gradient-to-r from-accent to-accent-light hover:from-accent-dark hover:to-accent text-white px-6 py-2 rounded-lg transition-all duration-300"
+                            className="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <i className="fas fa-undo mr-2"></i>
                             Return
                           </motion.button>
                         )}
