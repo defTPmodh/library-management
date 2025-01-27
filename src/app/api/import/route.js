@@ -22,9 +22,14 @@ export async function POST(request) {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     
+    // Define headers based on library type
+    const headers = library === "Girls Library" 
+      ? ['date', 'accNo', 'subject', 'classNo', 'title', 'author', 'publisher', 'publisherPlace', 'edition', 'pages', 'price', 'series', 'isbn', 'remarks']
+      : ['date', 'accNo', 'subject', 'classNo', 'title', 'edition', 'author', 'publishers', 'pages', 'price', 'isbn', 'remark'];
+
     // Convert to JSON with custom header mapping
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      header: ['date', 'accNo', 'classNo', 'subject', 'title', 'edition', 'author', 'publishers', 'pages', 'price', 'isbn', 'remark'],
+      header: headers,
       range: 1  // Skip header row
     });
 
@@ -43,6 +48,16 @@ export async function POST(request) {
         let priceStr = row.price ? row.price.toString() : '';
         priceStr = priceStr.replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '').trim();
 
+        // Handle publisher based on library type
+        const publisher = library === "Girls Library" 
+          ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
+          : row.publishers;
+
+        // Handle series for girls library
+        const remarks = library === "Girls Library"
+          ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
+          : row.remark;
+
         // Create book record
         const book = await prisma.book.create({
           data: {
@@ -50,7 +65,7 @@ export async function POST(request) {
             class_no: row.classNo?.toString(),
             title: title || "Unknown Title",
             author: row.author?.toString() || "Unknown Author",
-            publisher: row.publishers?.toString(),
+            publisher: publisher?.toString(),
             status: "available",
             library: library,
             genre: row.subject?.toString() || "Uncategorized",
@@ -58,7 +73,7 @@ export async function POST(request) {
             pages: row.pages?.toString(),
             price: priceStr,
             isbn: row.isbn?.toString(),
-            remarks: row.remark?.toString()
+            remarks: remarks?.toString()
           }
         });
 
@@ -93,7 +108,7 @@ export async function POST(request) {
     console.error("Error importing books:", error);
     return NextResponse.json({ 
       error: error.message,
-      hint: "Please ensure your Excel file matches the required format with columns: Date, Acc. No., Class No., Subject, Title, Edition, Author, Publishers, Pages, Price, ISBN, Remark"
+      hint: "Please ensure your Excel file matches the required format for your library type"
     }, { status: 500 });
   }
 } 
