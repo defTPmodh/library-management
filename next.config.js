@@ -1,21 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    experimental: {
-      appDir: true,
-      serverActions: {
-        bodySizeLimit: '10mb',
-      },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
     },
-    webpack: (config, { isServer }) => {
-      // Add any webpack configurations if needed
-      return config;
+  },
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
     },
-    api: {
-      responseLimit: false,
-      bodyParser: {
-        sizeLimit: '10mb',
-      },
-    },
-  }
-  
-  module.exports = nextConfig 
+    responseLimit: false,
+  },
+  httpAgentOptions: {
+    keepAlive: true,
+  },
+  serverRuntimeConfig: {
+    // Will only be available on the server side
+    timeoutSeconds: 300, // 5 minutes
+  },
+  publicRuntimeConfig: {
+    // Will be available on both server and client
+    apiTimeout: 300000, // 5 minutes in milliseconds
+  },
+}
+
+module.exports = nextConfig 
