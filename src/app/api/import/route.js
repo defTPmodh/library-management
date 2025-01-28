@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 import * as XLSX from 'xlsx';
 
+const BATCH_SIZE = 100; // Process 100 books at a time
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -33,75 +35,101 @@ export async function POST(request) {
       range: 1  // Skip header row
     });
 
-    console.log('Parsed Excel data:', jsonData); // Debug log
+    console.log(`Total books to import: ${jsonData.length}`);
 
-    // Process each row
-    const books = await Promise.all(jsonData.map(async (row) => {
-      try {
-        // Extract title from the format "Title (with Description)"
-        let title = row.title || '';
-        if (typeof title === 'string' && title.includes(':')) {
-          title = title.split(':')[0].trim();
+    // Process books in batches
+    const results = {
+      successful: 0,
+      failed: 0,
+      errors: []
+    };
+
+    // Split data into batches
+    for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
+      const batch = jsonData.slice(i, i + BATCH_SIZE);
+      
+      // Process batch in transaction
+      await prisma.$transaction(async (prisma) => {
+        for (const row of batch) {
+          try {
+            // Extract title
+            let title = row.title || '';
+            if (typeof title === 'string' && title.includes(':')) {
+              title = title.split(':')[0].trim();
+            }
+
+            // Format price
+            let priceStr = row.price ? row.price.toString() : '';
+            priceStr = priceStr.replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '').trim();
+
+            // Handle publisher
+            const publisher = library === "Girls Library" 
+              ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
+              : row.publishers;
+
+            // Handle series and remarks
+            const remarks = library === "Girls Library"
+              ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
+              : row.remark;
+
+            // Check for duplicate acc_no
+            const existingBook = await prisma.book.findFirst({
+              where: {
+                acc_no: row.accNo?.toString(),
+                library: library
+              }
+            });
+
+            if (existingBook) {
+              results.failed++;
+              results.errors.push(`Duplicate acc_no: ${row.accNo}`);
+              continue;
+            }
+
+            // Create book record
+            const book = await prisma.book.create({
+              data: {
+                acc_no: row.accNo?.toString(),
+                class_no: row.classNo?.toString(),
+                title: title || "Unknown Title",
+                author: row.author?.toString() || "Unknown Author",
+                publisher: publisher?.toString(),
+                status: "available",
+                library: library,
+                genre: row.subject?.toString() || "Uncategorized",
+                edition: row.edition?.toString(),
+                pages: row.pages?.toString(),
+                price: priceStr,
+                isbn: row.isbn?.toString(),
+                remarks: remarks?.toString()
+              }
+            });
+
+            // Create activity record
+            await prisma.activity.create({
+              data: {
+                action: "Book imported",
+                bookId: book.id,
+                userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
+              }
+            });
+
+            results.successful++;
+          } catch (error) {
+            results.failed++;
+            results.errors.push(`Error with book ${row.accNo}: ${error.message}`);
+          }
         }
+      });
 
-        // Format price to remove "Rs" and handle "(5 vols)" format
-        let priceStr = row.price ? row.price.toString() : '';
-        priceStr = priceStr.replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '').trim();
-
-        // Handle publisher based on library type
-        const publisher = library === "Girls Library" 
-          ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
-          : row.publishers;
-
-        // Handle series for girls library
-        const remarks = library === "Girls Library"
-          ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
-          : row.remark;
-
-        // Create book record
-        const book = await prisma.book.create({
-          data: {
-            acc_no: row.accNo?.toString(),
-            class_no: row.classNo?.toString(),
-            title: title || "Unknown Title",
-            author: row.author?.toString() || "Unknown Author",
-            publisher: publisher?.toString(),
-            status: "available",
-            library: library,
-            genre: row.subject?.toString() || "Uncategorized",
-            edition: row.edition?.toString(),
-            pages: row.pages?.toString(),
-            price: priceStr,
-            isbn: row.isbn?.toString(),
-            remarks: remarks?.toString()
-          }
-        });
-
-        // Create activity record
-        await prisma.activity.create({
-          data: {
-            action: "Book imported",
-            bookId: book.id,
-            userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
-          }
-        });
-
-        console.log('Successfully imported book:', book); // Debug log
-        return book;
-      } catch (error) {
-        console.error(`Error importing book ${row.accNo}:`, error);
-        return null;
-      }
-    }));
-
-    // Filter out failed imports
-    const successfulImports = books.filter(book => book !== null);
-    console.log(`Total successful imports: ${successfulImports.length}`); // Debug log
+      // Log progress
+      console.log(`Processed ${Math.min((i + BATCH_SIZE), jsonData.length)} of ${jsonData.length} books`);
+    }
 
     return NextResponse.json({ 
-      message: `Successfully imported ${successfulImports.length} books`,
-      failedImports: books.length - successfulImports.length,
-      books: successfulImports 
+      message: `Import completed. Successfully imported ${results.successful} books.`,
+      failedImports: results.failed,
+      errors: results.errors.slice(0, 100) // Return first 100 errors only
     });
 
   } catch (error) {
