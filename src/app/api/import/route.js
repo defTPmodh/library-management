@@ -33,7 +33,7 @@ export async function POST(request) {
       range: 1,
       defval: '',
       raw: false
-    });
+    }).filter(row => row.accNo || row.title);
 
     console.log('Parsed rows:', jsonData.length);
 
@@ -43,53 +43,50 @@ export async function POST(request) {
       errors: []
     };
 
-    // Process in very small chunks of 25 books
-    const chunkSize = 25;
+    // Process in smaller batches
+    const chunkSize = 20;
+    
     for (let i = 0; i < jsonData.length; i += chunkSize) {
       const chunk = jsonData.slice(i, i + chunkSize);
       
       try {
         // Process each book in the chunk
         for (const row of chunk) {
-          if (!row.accNo && !row.title) continue;
-
           try {
-            const bookData = {
-              acc_no: row.accNo?.toString(),
-              class_no: row.classNo?.toString(),
-              title: (row.title?.toString() || "Unknown Title").split(':')[0].trim(),
-              author: row.author?.toString() || "Unknown Author",
-              publisher: library === "Girls Library" 
-                ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
-                : row.publishers?.toString(),
-              status: "available",
-              library: library,
-              genre: row.subject?.toString() || "Uncategorized",
-              edition: row.edition?.toString(),
-              pages: row.pages?.toString(),
-              price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
-              isbn: row.isbn?.toString(),
-              remarks: library === "Girls Library"
-                ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
-                : row.remark?.toString()
-            };
+            // Create book first
+            const book = await prisma.book.create({
+              data: {
+                acc_no: row.accNo?.toString(),
+                class_no: row.classNo?.toString(),
+                title: (row.title?.toString() || "Unknown Title").split(':')[0].trim(),
+                author: row.author?.toString() || "Unknown Author",
+                publisher: library === "Girls Library" 
+                  ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
+                  : row.publishers?.toString(),
+                status: "available",
+                library: library,
+                genre: row.subject?.toString() || "Uncategorized",
+                edition: row.edition?.toString(),
+                pages: row.pages?.toString(),
+                price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
+                isbn: row.isbn?.toString(),
+                remarks: library === "Girls Library"
+                  ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
+                  : row.remark?.toString()
+              }
+            });
 
-            // Create book and activity in a single transaction
-            await prisma.$transaction(async (tx) => {
-              const book = await tx.book.create({
-                data: bookData
-              });
-
-              await tx.activity.create({
-                data: {
-                  action: "Book imported",
-                  bookId: book.id,
-                  userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
-                }
-              });
+            // Create activity for the book
+            await prisma.activity.create({
+              data: {
+                action: "Book imported",
+                bookId: book.id,
+                userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
+              }
             });
 
             results.successful++;
+            console.log(`Successfully imported book: ${book.title}`);
           } catch (error) {
             console.error(`Error importing book ${row.accNo}:`, error);
             results.failed++;
@@ -97,9 +94,13 @@ export async function POST(request) {
           }
         }
 
-        // Add a small delay between chunks to prevent overload
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Log progress after each chunk
         console.log(`Processed ${Math.min(i + chunkSize, jsonData.length)} of ${jsonData.length} books. Success: ${results.successful}`);
+        
+        // Small delay between chunks
+        if (i + chunkSize < jsonData.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
       } catch (error) {
         console.error('Chunk error:', error);
         results.errors.push(`Error processing chunk ${i}-${i + chunkSize}: ${error.message}`);
