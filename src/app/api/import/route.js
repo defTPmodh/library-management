@@ -24,16 +24,17 @@ export async function POST(request) {
 
     console.log('Total rows in Excel:', totalRows);
 
+    // Different headers for different libraries
     const headers = library === "Girls Library" 
       ? ['date', 'accNo', 'subject', 'classNo', 'title', 'author', 'publisher', 'publisherPlace', 'edition', 'pages', 'price', 'series', 'isbn', 'remarks']
-      : ['date', 'accNo', 'classNo', 'subject', 'title', 'edition', 'author', 'publishers', 'pages', 'price', 'isbn', 'remark'];
+      : ['date', 'accNo', 'classNo', 'subject', 'titleWithDesc', 'edition', 'author', 'publishers', 'pages', 'price', 'isbn', 'remark'];
 
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
       header: headers,
       range: 1,
       defval: '',
       raw: false
-    }).filter(row => row.accNo || row.title);
+    }).filter(row => row.accNo || row.title || row.titleWithDesc);
 
     console.log('Parsed rows:', jsonData.length);
 
@@ -43,27 +44,19 @@ export async function POST(request) {
       errors: []
     };
 
-    // Process in smaller batches to fit within 60-second limit
+    // Process in smaller batches
     const chunkSize = 50;
     const chunks = [];
     
-    // Split data into chunks
-    for (let i = 0; i < jsonData.length; i += chunkSize) {
-      chunks.push(jsonData.slice(i, i + chunkSize));
-    }
-
-    // Process each chunk
-    for (const chunk of chunks) {
-      try {
-        // Prepare batch data
-        const booksData = chunk.map(row => ({
+    // Transform data based on library type
+    const transformedData = jsonData.map(row => {
+      if (library === "Girls Library") {
+        return {
           acc_no: row.accNo?.toString(),
           class_no: row.classNo?.toString(),
           title: (row.title?.toString() || "Unknown Title").split(':')[0].trim(),
           author: row.author?.toString() || "Unknown Author",
-          publisher: library === "Girls Library" 
-            ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
-            : row.publishers?.toString(),
+          publisher: `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`,
           status: "available",
           library: library,
           genre: row.subject?.toString() || "Uncategorized",
@@ -71,14 +64,38 @@ export async function POST(request) {
           pages: row.pages?.toString(),
           price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
           isbn: row.isbn?.toString(),
-          remarks: library === "Girls Library"
-            ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
-            : row.remark?.toString()
-        }));
+          remarks: `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
+        };
+      } else {
+        // Boys Library format
+        return {
+          acc_no: row.accNo?.toString(),
+          class_no: row.classNo?.toString(),
+          title: (row.titleWithDesc?.toString() || "Unknown Title").split(':')[0].trim(),
+          author: row.author?.toString() || "Unknown Author",
+          publisher: row.publishers?.toString(),
+          status: "available",
+          library: library,
+          genre: row.subject?.toString() || "Uncategorized",
+          edition: row.edition?.toString(),
+          pages: row.pages?.toString(),
+          price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
+          isbn: row.isbn?.toString(),
+          remarks: row.remark?.toString()
+        };
+      }
+    });
 
-        // Create books in batch
+    // Split into chunks
+    for (let i = 0; i < transformedData.length; i += chunkSize) {
+      chunks.push(transformedData.slice(i, i + chunkSize));
+    }
+
+    // Process chunks
+    for (const chunk of chunks) {
+      try {
         const createdBooks = await prisma.book.createMany({
-          data: booksData,
+          data: chunk,
           skipDuplicates: true
         });
 
@@ -92,12 +109,12 @@ export async function POST(request) {
       }
     }
 
-    // Create a single activity record for the batch
+    // Create a single activity record
     if (results.successful > 0) {
       await prisma.activity.create({
         data: {
           action: `Imported ${results.successful} books`,
-          bookId: 1, // Using a placeholder ID
+          bookId: 1,
           userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
         }
       });
