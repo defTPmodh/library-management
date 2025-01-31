@@ -43,69 +43,64 @@ export async function POST(request) {
       errors: []
     };
 
-    // Process in smaller batches
-    const chunkSize = 20;
+    // Process in smaller batches to fit within 60-second limit
+    const chunkSize = 50;
+    const chunks = [];
     
+    // Split data into chunks
     for (let i = 0; i < jsonData.length; i += chunkSize) {
-      const chunk = jsonData.slice(i, i + chunkSize);
-      
+      chunks.push(jsonData.slice(i, i + chunkSize));
+    }
+
+    // Process each chunk
+    for (const chunk of chunks) {
       try {
-        // Process each book in the chunk
-        for (const row of chunk) {
-          try {
-            // Create book first
-            const book = await prisma.book.create({
-              data: {
-                acc_no: row.accNo?.toString(),
-                class_no: row.classNo?.toString(),
-                title: (row.title?.toString() || "Unknown Title").split(':')[0].trim(),
-                author: row.author?.toString() || "Unknown Author",
-                publisher: library === "Girls Library" 
-                  ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
-                  : row.publishers?.toString(),
-                status: "available",
-                library: library,
-                genre: row.subject?.toString() || "Uncategorized",
-                edition: row.edition?.toString(),
-                pages: row.pages?.toString(),
-                price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
-                isbn: row.isbn?.toString(),
-                remarks: library === "Girls Library"
-                  ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
-                  : row.remark?.toString()
-              }
-            });
+        // Prepare batch data
+        const booksData = chunk.map(row => ({
+          acc_no: row.accNo?.toString(),
+          class_no: row.classNo?.toString(),
+          title: (row.title?.toString() || "Unknown Title").split(':')[0].trim(),
+          author: row.author?.toString() || "Unknown Author",
+          publisher: library === "Girls Library" 
+            ? `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`
+            : row.publishers?.toString(),
+          status: "available",
+          library: library,
+          genre: row.subject?.toString() || "Uncategorized",
+          edition: row.edition?.toString(),
+          pages: row.pages?.toString(),
+          price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
+          isbn: row.isbn?.toString(),
+          remarks: library === "Girls Library"
+            ? `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
+            : row.remark?.toString()
+        }));
 
-            // Create activity for the book
-            await prisma.activity.create({
-              data: {
-                action: "Book imported",
-                bookId: book.id,
-                userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
-              }
-            });
+        // Create books in batch
+        const createdBooks = await prisma.book.createMany({
+          data: booksData,
+          skipDuplicates: true
+        });
 
-            results.successful++;
-            console.log(`Successfully imported book: ${book.title}`);
-          } catch (error) {
-            console.error(`Error importing book ${row.accNo}:`, error);
-            results.failed++;
-            results.errors.push(`Error with book ${row.accNo}: ${error.message}`);
-          }
-        }
+        results.successful += createdBooks.count;
+        console.log(`Successfully imported ${createdBooks.count} books from chunk`);
 
-        // Log progress after each chunk
-        console.log(`Processed ${Math.min(i + chunkSize, jsonData.length)} of ${jsonData.length} books. Success: ${results.successful}`);
-        
-        // Small delay between chunks
-        if (i + chunkSize < jsonData.length) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
       } catch (error) {
         console.error('Chunk error:', error);
-        results.errors.push(`Error processing chunk ${i}-${i + chunkSize}: ${error.message}`);
+        results.errors.push(error.message);
         results.failed += chunk.length;
       }
+    }
+
+    // Create a single activity record for the batch
+    if (results.successful > 0) {
+      await prisma.activity.create({
+        data: {
+          action: `Imported ${results.successful} books`,
+          bookId: 1, // Using a placeholder ID
+          userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
+        }
+      });
     }
 
     return NextResponse.json({ 
