@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
+import prisma from '../../../../lib/prisma';
 
 export async function GET(request) {
   try {
@@ -134,6 +131,39 @@ export async function DELETE(request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error in DELETE /api/books:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request, { params }) {
+  try {
+    const { id } = params;
+    const updateData = await request.json();
+    
+    const updatedBook = await prisma.book.update({
+      where: { id: parseInt(id) },
+      data: {
+        title: updateData.title,
+        author: updateData.author,
+        genre: updateData.genre,
+        acc_no: updateData.acc_no,
+        class_no: updateData.class_no,
+        publisher: updateData.publisher
+      }
+    });
+
+    // Create activity record for the update
+    await prisma.activity.create({
+      data: {
+        action: "Book updated",
+        bookId: parseInt(id),
+        userId: updateData.library === "Girls Library" ? "GIRLS001" : "BOYS001"
+      }
+    });
+
+    return NextResponse.json(updatedBook);
+  } catch (error) {
+    console.error("Error updating book:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
