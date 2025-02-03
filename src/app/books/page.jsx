@@ -136,6 +136,7 @@ function BooksPage() {
   const [classNo, setClassNo] = useState("");
   const [publisher, setPublisher] = useState("");
   const [selectedBook, setSelectedBook] = useState(null);
+  const [editingBook, setEditingBook] = useState(null);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -358,6 +359,49 @@ function BooksPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleEditClick = (book) => {
+    setEditingBook({
+      ...book,
+      tempTitle: book.title,
+      tempAuthor: book.author,
+      tempGenre: book.genre,
+      tempAccNo: book.acc_no || '',
+      tempClassNo: book.class_no || '',
+      tempPublisher: book.publisher || ''
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      const dbName = localStorage.getItem("databaseName");
+      const response = await fetch(`/api/books/${editingBook.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editingBook.tempTitle,
+          author: editingBook.tempAuthor,
+          genre: editingBook.tempGenre,
+          acc_no: editingBook.tempAccNo,
+          class_no: editingBook.tempClassNo,
+          publisher: editingBook.tempPublisher,
+          library: libraryName
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update book');
+      }
+
+      await fetchBooks();
+      setEditingBook(null);
+    } catch (error) {
+      console.error('Error updating book:', error);
+      alert('Failed to update book');
+    }
+  };
+
   const filteredBooks = selectedGenreFilter === "All" 
     ? books 
     : books.filter(book => book.genre === selectedGenreFilter);
@@ -573,45 +617,114 @@ function BooksPage() {
                     key={book.id}
                     className="flex items-center justify-between bg-white/50 dark:bg-gray-800/50 p-4 rounded-lg shadow backdrop-blur-sm"
                   >
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-800 dark:text-gray-200">
-                        <span className="text-primary dark:text-primary-light mr-2">#{book.id}</span>
-                        {book.title}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">by {book.author}</p>
-                      <div className="flex space-x-2">
-                        <span
-                          className={`text-sm ${
-                            book.status === "available"
-                              ? "text-accent dark:text-accent-light"
-                              : "text-secondary dark:text-secondary-light"
-                          }`}
+                    {editingBook?.id === book.id ? (
+                      <div className="w-full space-y-3">
+                        <input
+                          type="text"
+                          value={editingBook.tempTitle}
+                          onChange={(e) => setEditingBook({...editingBook, tempTitle: e.target.value})}
+                          className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+                          placeholder="Book Title"
+                        />
+                        <input
+                          type="text"
+                          value={editingBook.tempAuthor}
+                          onChange={(e) => setEditingBook({...editingBook, tempAuthor: e.target.value})}
+                          className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+                          placeholder="Author"
+                        />
+                        <input
+                          type="text"
+                          value={editingBook.tempAccNo}
+                          onChange={(e) => setEditingBook({...editingBook, tempAccNo: e.target.value})}
+                          className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+                          placeholder="Accession Number"
+                        />
+                        <input
+                          type="text"
+                          value={editingBook.tempClassNo}
+                          onChange={(e) => setEditingBook({...editingBook, tempClassNo: e.target.value})}
+                          className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+                          placeholder="Class Number"
+                        />
+                        <input
+                          type="text"
+                          value={editingBook.tempPublisher}
+                          onChange={(e) => setEditingBook({...editingBook, tempPublisher: e.target.value})}
+                          className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+                          placeholder="Publisher"
+                        />
+                        <select
+                          value={editingBook.tempGenre}
+                          onChange={(e) => setEditingBook({...editingBook, tempGenre: e.target.value})}
+                          className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
                         >
-                          {book.status}
-                        </span>
-                        <span className="text-sm text-primary dark:text-primary-light">
-                          {book.genre}
-                        </span>
+                          {GENRES.map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                        <div className="flex space-x-2">
+                          <motion.button
+                            onClick={handleSaveEdit}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="px-4 py-2 bg-primary text-white rounded-md"
+                          >
+                            Save
+                          </motion.button>
+                          <motion.button
+                            onClick={() => setEditingBook(null)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="px-4 py-2 bg-gray-500 text-white rounded-md"
+                          >
+                            Cancel
+                          </motion.button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <motion.button
-                        onClick={() => setSelectedBook(book)}
-                        className="text-primary dark:text-primary-light hover:text-primary-dark dark:hover:text-primary-light/80"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                      >
-                        <i className="fas fa-info-circle"></i>
-                      </motion.button>
-                      <motion.button
-                        onClick={() => handleDelete(book.id)}
-                        className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </motion.button>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-800 dark:text-gray-200">
+                            <span className="text-primary dark:text-primary-light mr-2">#{book.id}</span>
+                            {book.title}
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-400">by {book.author}</p>
+                          <div className="flex space-x-2">
+                            <span
+                              className={`text-sm ${
+                                book.status === "available"
+                                  ? "text-accent dark:text-accent-light"
+                                  : "text-secondary dark:text-secondary-light"
+                              }`}
+                            >
+                              {book.status}
+                            </span>
+                            <span className="text-sm text-primary dark:text-primary-light">
+                              {book.genre}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <motion.button
+                            onClick={() => handleEditClick(book)}
+                            className="text-primary dark:text-primary-light hover:text-primary-dark dark:hover:text-primary-light/80"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <i className="fas fa-edit"></i>
+                          </motion.button>
+                          <motion.button
+                            onClick={() => handleDelete(book.id)}
+                            className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <i className="fas fa-trash"></i>
+                          </motion.button>
+                        </div>
+                      </>
+                    )}
                   </motion.li>
                 ))}
               </motion.ul>
