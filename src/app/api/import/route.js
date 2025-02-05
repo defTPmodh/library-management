@@ -8,6 +8,8 @@ export async function POST(request) {
     const file = formData.get('file');
     const library = formData.get('library');
 
+    console.log('Starting import for library:', library);
+
     if (!file || !library) {
       return NextResponse.json({ 
         error: "Missing file or library" 
@@ -19,77 +21,68 @@ export async function POST(request) {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     
-    const range = XLSX.utils.decode_range(worksheet['!ref']);
-    const totalRows = range.e.r;
+    const rawData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
 
-    console.log('Total rows in Excel:', totalRows);
+    console.log('Raw data first row:', rawData[0]);
 
-    // Different headers for different libraries
-    const headers = library === "Girls Library" 
-      ? ['date', 'accNo', 'subject', 'classNo', 'title', 'author', 'publisher', 'publisherPlace', 'edition', 'pages', 'price', 'series', 'isbn', 'remarks']
-      : ['date', 'accNo', 'classNo', 'subject', 'titleWithDesc', 'edition', 'author', 'publishers', 'pages', 'price', 'isbn', 'remark'];
+    if (!rawData || rawData.length === 0) {
+      throw new Error('No data found in Excel file');
+    }
 
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      header: headers,
-      range: 1,
-      defval: '',
-      raw: false
-    }).filter(row => row.accNo || row.title || row.titleWithDesc);
+    const transformedData = rawData.map((row, index) => {
+      try {
+        // Only include fields that exist in your schema
+        const transformed = {
+          acc_no: String(row['Acc. No.'] || ''),
+          class_no: String(row['Class No.'] || ''),
+          title: String(row['Title (with Discription)'] || 'Unknown Title'),
+          author: String(row['Author'] || 'Unknown Author'),
+          publisher: String(row['Publisher'] || ''),
+          status: "available",
+          library: library,
+          genre: String(row['Subject'] || 'Uncategorized'),
+          edition: String(row['Edition'] || ''),
+          pages: String(row['pages'] || ''),
+          price: String(row['Price'] || '').replace(/Rs\s*/, '').trim(),
+          isbn: String(row['ISBN'] || ''),
+          remarks: String(row['Remark'] || '')
+        };
 
-    console.log('Parsed rows:', jsonData.length);
+        // Validate required fields
+        if (!transformed.title || !transformed.author) {
+          console.warn(`Skipping row ${index + 2}: Missing required fields`);
+          return null;
+        }
+
+        return transformed;
+      } catch (error) {
+        console.error(`Error transforming row ${index + 2}:`, error);
+        return null;
+      }
+    }).filter(Boolean);
+
+    console.log(`Transformed ${transformedData.length} valid rows`);
+    console.log('Sample transformed row:', transformedData[0]);
+
+    if (transformedData.length === 0) {
+      throw new Error('No valid data to import after transformation');
+    }
+
+    // Process in smaller batches
+    const chunkSize = 10;
+    const chunks = [];
+    for (let i = 0; i < transformedData.length; i += chunkSize) {
+      chunks.push(transformedData.slice(i, i + chunkSize));
+    }
 
     const results = {
       successful: 0,
       failed: 0,
       errors: []
     };
-
-    // Process in smaller batches
-    const chunkSize = 50;
-    const chunks = [];
-    
-    // Transform data based on library type
-    const transformedData = jsonData.map(row => {
-      if (library === "Girls Library") {
-        return {
-          acc_no: row.accNo?.toString(),
-          class_no: row.classNo?.toString(),
-          title: (row.title?.toString() || "Unknown Title").split(':')[0].trim(),
-          author: row.author?.toString() || "Unknown Author",
-          publisher: `${row.publisher || ''}${row.publisherPlace ? ', ' + row.publisherPlace : ''}`,
-          status: "available",
-          library: library,
-          genre: row.subject?.toString() || "Uncategorized",
-          edition: row.edition?.toString(),
-          pages: row.pages?.toString(),
-          price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
-          isbn: row.isbn?.toString(),
-          remarks: `${row.series ? 'Series: ' + row.series + '. ' : ''}${row.remarks || ''}`
-        };
-      } else {
-        // Boys Library format
-        return {
-          acc_no: row.accNo?.toString(),
-          class_no: row.classNo?.toString(),
-          title: (row.titleWithDesc?.toString() || "Unknown Title").split(':')[0].trim(),
-          author: row.author?.toString() || "Unknown Author",
-          publisher: row.publishers?.toString(),
-          status: "available",
-          library: library,
-          genre: row.subject?.toString() || "Uncategorized",
-          edition: row.edition?.toString(),
-          pages: row.pages?.toString(),
-          price: (row.price ? row.price.toString().replace(/Rs\s*/, '').replace(/\s*\([^)]*\)/, '') : '').trim(),
-          isbn: row.isbn?.toString(),
-          remarks: row.remark?.toString()
-        };
-      }
-    });
-
-    // Split into chunks
-    for (let i = 0; i < transformedData.length; i += chunkSize) {
-      chunks.push(transformedData.slice(i, i + chunkSize));
-    }
 
     // Process chunks
     for (const chunk of chunks) {
@@ -104,35 +97,32 @@ export async function POST(request) {
 
       } catch (error) {
         console.error('Chunk error:', error);
-        results.errors.push(error.message);
+        results.errors.push(`${error.message} (${error.code})`);
         results.failed += chunk.length;
       }
     }
 
-    // Create a single activity record
-    if (results.successful > 0) {
-      await prisma.activity.create({
-        data: {
-          action: `Imported ${results.successful} books`,
-          bookId: 1,
-          userId: library === "Girls Library" ? "GIRLS001" : "BOYS001"
-        }
-      });
-    }
+    // Log final results
+    console.log('Import results:', {
+      successful: results.successful,
+      failed: results.failed,
+      errors: results.errors
+    });
 
     return NextResponse.json({ 
       message: `Import completed. Successfully imported ${results.successful} books.`,
-      totalRows: totalRows,
-      parsedRows: jsonData.length,
+      totalRows: rawData.length,
+      importedRows: results.successful,
       failedImports: results.failed,
-      errors: results.errors.slice(0, 100)
+      errors: results.errors
     });
 
   } catch (error) {
     console.error("Error importing books:", error);
     return NextResponse.json({ 
       error: error.message,
-      hint: "Please ensure your Excel file matches the required format for your library type"
+      stack: error.stack,
+      hint: "Please ensure your Excel file matches the required format"
     }, { status: 500 });
   }
 } 
