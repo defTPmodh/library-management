@@ -137,6 +137,15 @@ function BooksPage() {
   const [publisher, setPublisher] = useState("");
   const [selectedBook, setSelectedBook] = useState(null);
   const [editingBook, setEditingBook] = useState(null);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [subject, setSubject] = useState('');
+  const [placeOfPublisher, setPlaceOfPublisher] = useState('');
+  const [edition, setEdition] = useState('');
+  const [pages, setPages] = useState('');
+  const [price, setPrice] = useState('');
+  const [series, setSeries] = useState('');
+  const [isbn, setIsbn] = useState('');
+  const [remark, setRemark] = useState('');
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -236,51 +245,61 @@ function BooksPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !author || !bookId) return;
+    if (!accNo || !title) return;
 
     try {
       const dbName = localStorage.getItem("databaseName");
-      console.log("Adding book with:", {
-        bookId,
-        accNo,
-        classNo,
-        title,
-        author,
-        publisher,
-        genre
-      });
-      
       const response = await fetch(`/api/db/${dbName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: "INSERT INTO `books` (id, acc_no, class_no, title, author, publisher, genre, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'available')",
-          values: [parseInt(bookId), accNo, classNo, title, author, publisher, genre]
+          query: "INSERT INTO books (acc_no, class_no, subject, title, author, publisher, place_of_publisher, edition, pages, price, series, isbn, remark, date_added, library, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')",
+          values: [
+            accNo,
+            classNo,
+            subject,
+            title,
+            author,
+            publisher,
+            placeOfPublisher,
+            edition,
+            pages,
+            price,
+            series,
+            isbn,
+            remark,
+            date,
+            libraryName
+          ]
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.details || data.error || 'Failed to add book');
+        const error = await response.json();
+        throw new Error(error.details || error.error || 'Failed to add book');
       }
 
-      console.log("Book added successfully:", data);
       await fetchBooks();
       
       // Reset form
-      setBookId("");
-      setAccNo("");
-      setClassNo("");
-      setTitle("");
-      setAuthor("");
-      setPublisher("");
-      setGenre("Fiction");
+      setAccNo('');
+      setClassNo('');
+      setSubject('');
+      setTitle('');
+      setAuthor('');
+      setPublisher('');
+      setPlaceOfPublisher('');
+      setEdition('');
+      setPages('');
+      setPrice('');
+      setSeries('');
+      setIsbn('');
+      setRemark('');
     } catch (error) {
       console.error("Error adding book:", error);
-      alert(error.message); // Show error to user
+      alert(error.message);
     }
   };
 
@@ -504,76 +523,134 @@ function BooksPage() {
             onSubmit={handleSubmit}
             className="bg-surface/80 dark:bg-surface-dark/80 backdrop-blur-md p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 mb-8"
           >
-            <motion.div className="mb-4" variants={itemVariants}>
+            <motion.div className="mb-4">
               <input
-                type="text"
-                value={bookId}
-                onChange={(e) => setBookId(e.target.value)}
-                placeholder="Book ID"
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
               />
             </motion.div>
-            <motion.div className="mb-4" variants={itemVariants}>
+            <motion.div className="mb-4">
               <input
                 type="text"
                 value={accNo}
                 onChange={(e) => setAccNo(e.target.value)}
                 placeholder="Accession Number"
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
               />
             </motion.div>
-            <motion.div className="mb-4" variants={itemVariants}>
+            <motion.div className="mb-4">
               <input
                 type="text"
                 value={classNo}
                 onChange={(e) => setClassNo(e.target.value)}
                 placeholder="Class Number"
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
               />
             </motion.div>
-            <motion.div className="mb-4" variants={itemVariants}>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Subject"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Book Title"
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+                placeholder="Title (with Description)"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
               />
             </motion.div>
-            <motion.div className="mb-4" variants={itemVariants}>
+            <motion.div className="mb-4">
               <input
                 type="text"
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
                 placeholder="Author Name"
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
               />
             </motion.div>
-            <motion.div className="mb-4" variants={itemVariants}>
+            <motion.div className="mb-4">
               <input
                 type="text"
                 value={publisher}
                 onChange={(e) => setPublisher(e.target.value)}
                 placeholder="Publisher"
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
               />
             </motion.div>
-            <motion.div className="mb-4" variants={itemVariants}>
-              <select
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary-light/20 transition-colors outline-none backdrop-blur-sm"
-              >
-                {GENRES.map((g) => (
-                  <option key={g} value={g} className="bg-white dark:bg-gray-800">
-                    {g}
-                  </option>
-                ))}
-              </select>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={placeOfPublisher}
+                onChange={(e) => setPlaceOfPublisher(e.target.value)}
+                placeholder="Place of Publisher"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={edition}
+                onChange={(e) => setEdition(e.target.value)}
+                placeholder="Edition"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={pages}
+                onChange={(e) => setPages(e.target.value)}
+                placeholder="Pages"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="Price"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={series}
+                onChange={(e) => setSeries(e.target.value)}
+                placeholder="Series"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={isbn}
+                onChange={(e) => setIsbn(e.target.value)}
+                placeholder="ISBN"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
+            </motion.div>
+            <motion.div className="mb-4">
+              <input
+                type="text"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="Remark"
+                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50"
+              />
             </motion.div>
             <motion.button
               type="submit"
-              className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white px-4 py-2 rounded-md transition-all duration-300 transform hover:-translate-y-0.5"
+              className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark text-white px-4 py-2 rounded-md"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
